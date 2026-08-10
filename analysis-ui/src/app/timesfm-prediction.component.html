@@ -1,0 +1,165 @@
+<main class="prediction-page">
+  <header class="prediction-toolbar">
+    <a class="brand" href="/?view=timesfm" aria-label="TimesFM forecast home">
+      <span class="brand-mark">T</span>
+      <span>TRADINGAGENTS <strong>FORECAST LAB</strong></span>
+    </a>
+    <div class="live-pill" [class.connected]="liveStatus() === 'connected'">
+      <span class="status-dot"></span>
+      {{ liveStatus() === 'connected' ? 'DSE live' : liveStatus() === 'connecting' ? 'Connecting' : 'Historical mode' }}
+    </div>
+  </header>
+
+  @if (loading()) {
+    <section class="loading-state" aria-live="polite">
+      <span class="loader"></span>
+      <h1>Loading TimesFM prediction</h1>
+      <p>Reading the saved backtest and chart series…</p>
+    </section>
+  }
+
+  @if (errorMessage()) {
+    <section class="empty-state" aria-live="polite">
+      <span class="eyebrow">NO PREDICTION RUN</span>
+      <h1>Generate the forecast first.</h1>
+      <p>{{ errorMessage() }}</p>
+      <code>tradingagents-predict "BXPHARMA'PB" --resolution 1d --open-ui</code>
+    </section>
+  }
+
+  @if (result(); as report) {
+    <section class="hero">
+      <div>
+        <p class="eyebrow">TIMESFM {{ report.model.version }} · ZERO-SHOT PRICE FORECAST</p>
+        <div class="symbol-line">
+          <h1>{{ report.symbol }}</h1>
+          <span>{{ report.data.resolution_label }}</span>
+          <span>{{ report.currency }}</span>
+        </div>
+        <p class="hero-copy">
+          The first {{ report.data.context_points | number }} bars are the only model context.
+          The following {{ report.data.holdout_points | number }} real bars remain unseen until scoring.
+        </p>
+      </div>
+      <article class="accuracy-card">
+        <span>Holdout accuracy</span>
+        <strong>{{ report.metrics.accuracy_score | number: '1.1-2' }}<small>%</small></strong>
+        <p>100 − sMAPE across the full hidden half</p>
+      </article>
+    </section>
+
+    <section class="metric-grid" aria-label="Backtest metrics">
+      <article>
+        <span>Mean error</span>
+        <strong>{{ price(report.metrics.mae) }}</strong>
+        <small>MAE per bar</small>
+      </article>
+      <article>
+        <span>Direction calls</span>
+        <strong>{{ percent(report.metrics.directional_accuracy_percent) }}</strong>
+        <small>Up/down matched</small>
+      </article>
+      <article>
+        <span>80% band coverage</span>
+        <strong>{{ percent(report.metrics.interval_80_coverage_percent) }}</strong>
+        <small>Actual inside Q10–Q90</small>
+      </article>
+      <article [class.negative]="(report.metrics.skill_vs_naive_percent || 0) < 0">
+        <span>Vs. last-price baseline</span>
+        <strong>{{ signedPercent(report.metrics.skill_vs_naive_percent) }}</strong>
+        <small>MAE skill score</small>
+      </article>
+      <article class="live-metric">
+        <span>Live traded price</span>
+        <strong>{{ price(livePrice()) }}</strong>
+        <small>{{ report.live_feed.stock_code }}</small>
+      </article>
+    </section>
+
+    <section class="chart-card">
+      <header>
+        <div>
+          <p class="eyebrow">HISTORICAL BACKTEST + FORWARD PATH</p>
+          <h2>Actual candles against TimesFM</h2>
+        </div>
+        <div class="legend" aria-label="Chart legend">
+          <span><i class="candle"></i>Actual OHLC</span>
+          <span><i class="backtest"></i>Held-out prediction</span>
+          <span><i class="future"></i>Future forecast</span>
+          <span><i class="live"></i>Live actual</span>
+        </div>
+      </header>
+      <div #predictionChart class="prediction-chart" role="img" aria-label="DSE actual and TimesFM forecast chart"></div>
+      <footer>
+        <span>Context</span>
+        <strong>{{ report.data.first_timestamp | date: 'mediumDate' }} → {{ report.history[report.data.context_points - 1].time | date: 'mediumDate' }}</strong>
+        <span>Hidden test</span>
+        <strong>{{ report.backtest[0].time | date: 'mediumDate' }} → {{ report.data.last_timestamp | date: 'mediumDate' }}</strong>
+        <span>Next forecast</span>
+        <strong>{{ report.future.length }} bars</strong>
+      </footer>
+    </section>
+
+    <section class="detail-grid">
+      <article class="live-card">
+        <p class="eyebrow">REAL-TIME MATCH</p>
+        <h2>Prediction vs. latest trade</h2>
+        @if (latestLiveMatch(); as match) {
+          <div class="live-comparison">
+            <div><span>Predicted</span><strong>{{ price(match.predicted) }}</strong></div>
+            <div><span>Observed</span><strong>{{ price(match.actual) }}</strong></div>
+            <div><span>Live accuracy</span><strong>{{ match.accuracyPercent | number: '1.1-2' }}%</strong></div>
+          </div>
+          <p>Matched to the nearest forecast bar at {{ match.targetTime | date: 'medium' }}.</p>
+        } @else {
+          <div class="waiting-live">
+            <span class="pulse-ring"></span>
+            <p>Waiting for the next <code>{{ report.live_feed.topic }}</code> update for {{ report.live_feed.stock_code }}.</p>
+          </div>
+        }
+      </article>
+
+      <article class="model-card">
+        <p class="eyebrow">MODEL & HARDWARE</p>
+        <h2>{{ report.model.name }} {{ report.model.version }}</h2>
+        <dl>
+          <div><dt>Checkpoint</dt><dd>{{ report.model.checkpoint }}</dd></div>
+          <div><dt>Parameters</dt><dd>{{ report.model.parameters / 1000000 | number: '1.0-0' }}M</dd></div>
+          <div><dt>Compute</dt><dd>{{ report.model.gpu_name || report.model.device }}</dd></div>
+          <div><dt>Recursive chunks</dt><dd>{{ report.model.recursive_chunks }}</dd></div>
+        </dl>
+      </article>
+    </section>
+
+    <section class="table-card">
+      <header>
+        <div>
+          <p class="eyebrow">LAST 12 HELD-OUT BARS</p>
+          <h2>Point-level audit</h2>
+        </div>
+        <span>Every displayed score comes from real data withheld from the model.</span>
+      </header>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Time</th><th>Actual</th><th>Predicted</th><th>Absolute error</th><th>Q10–Q90</th></tr></thead>
+          <tbody>
+            @for (point of recentBacktest(); track trackBacktest($index, point)) {
+              <tr>
+                <td>{{ point.time | date: 'medium' }}</td>
+                <td>{{ price(point.actual) }}</td>
+                <td>{{ price(point.predicted) }}</td>
+                <td>{{ price(point.absolute_error) }}</td>
+                <td>{{ price(point.q10) }} – {{ price(point.q90) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="prediction-footer">
+      <span>{{ report.disclaimer }}</span>
+      <code>{{ report.run_id }}</code>
+    </footer>
+  }
+</main>

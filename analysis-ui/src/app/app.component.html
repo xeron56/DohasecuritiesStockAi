@@ -1,0 +1,232 @@
+@if (predictionMode) {
+  <app-timesfm-prediction />
+} @else {
+<main class="analysis-page" [class.bangla-copy]="language() === 'bn'">
+  <header class="analysis-toolbar">
+    <a class="brand" href="#top" aria-label="DSE AI Analysis home">
+      <span class="brand-dot"></span>
+      <span>DSE <strong>AI ANALYSIS</strong></span>
+    </a>
+
+    <div class="analysis-controls">
+      <label class="stock-selector">
+        <span class="sr-only">Select a DSE stock</span>
+        <select
+          [(ngModel)]="selectedSymbol"
+          [disabled]="loadingStocks()"
+          (change)="selectStock()"
+        >
+          @for (stock of stocks(); track stock.symbol) {
+            <option [value]="stock.symbol">
+              {{ stock.symbol }} · {{ stock.name }}
+            </option>
+          }
+        </select>
+      </label>
+
+      <button
+        class="primary-button"
+        type="button"
+        [disabled]="loadingAnalysis()"
+        (click)="runAnalysis(false)"
+      >
+        {{ language() === 'bn' ? 'বিশ্লেষণ চালান' : 'Run analysis' }}
+      </button>
+
+      <div class="language-switch" role="group" aria-label="Report language">
+        <button type="button" [class.active]="language() === 'en'" (click)="setLanguage('en')">English</button>
+        <button type="button" [class.active]="language() === 'bn'" (click)="setLanguage('bn')">বাংলা</button>
+      </div>
+    </div>
+  </header>
+
+  @if (loadingAnalysis() && !analysis()) {
+    <section class="loading-state" aria-live="polite">
+      <div class="skeleton short"></div>
+      <div class="skeleton tall"></div>
+      <div class="skeleton medium"></div>
+      <p>{{ jobMessage() || (language() === 'bn' ? 'ডিএসই তথ্য লোড হচ্ছে…' : 'Loading DSE evidence…') }}</p>
+    </section>
+  }
+
+  @if (errorMessage() && !analysis()) {
+    <section class="empty-state" aria-live="polite">
+      <p class="section-label">DSE AI ANALYSIS</p>
+      <h1>{{ language() === 'bn' ? 'বিশ্লেষণ প্রস্তুত নয়' : 'Analysis not ready' }}</h1>
+      <p>{{ errorMessage() }}</p>
+      <button class="primary-button" type="button" (click)="runAnalysis(false)">
+        {{ language() === 'bn' ? 'এখন বিশ্লেষণ চালান' : 'Run analysis now' }}
+      </button>
+    </section>
+  }
+
+  @if (analysis(); as report) {
+    <section class="company-heading" id="top">
+      <div>
+        <p class="eyebrow">DSE STOCK ANALYSIS</p>
+        <h1>{{ report.company_name }}</h1>
+        <div class="company-tags">
+          <span class="symbol-tag">{{ report.symbol }}</span>
+          <span>{{ report.sector }}</span>
+          <span>{{ language() === 'bn' ? 'সর্বশেষ দাম' : 'Latest price' }}: {{ formatTaka(report.market.latest_price) }}</span>
+          @if (report.market.change_percent !== null) {
+            <span [class.negative-change]="report.market.change_percent < 0" [class.positive-change]="report.market.change_percent > 0">
+              {{ report.market.change_percent > 0 ? '+' : '' }}{{ report.market.change_percent | number: '1.1-2' }}%
+            </span>
+          }
+        </div>
+      </div>
+      <div class="report-date">
+        <span>{{ language() === 'bn' ? 'বিশ্লেষণের তারিখ' : 'Analysis date' }}</span>
+        <strong>{{ report.analysis_date | date: 'mediumDate' }}</strong>
+      </div>
+    </section>
+
+    <section class="score-overview">
+      <article class="score-card">
+        <p class="section-label">{{ language() === 'bn' ? 'মৌলিক স্কোর' : 'Fundamental score' }}</p>
+        <div class="score-chart">
+          <canvas #scoreCanvas aria-label="Fundamental score chart"></canvas>
+          <div class="score-center">
+            <strong>{{ report.fundamental_score }}</strong>
+            <span>/ 100</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="our-take">
+        <div class="score-word">{{ copy(report.score_label) }}</div>
+        <p class="section-label">{{ language() === 'bn' ? 'আমাদের মত' : 'Our take' }}</p>
+        <h2>{{ copy(report.headline) }}</h2>
+        <ul>
+          @for (takeaway of report.takeaways; track takeaway.en) {
+            <li>{{ copy(takeaway) }}</li>
+          }
+        </ul>
+      </article>
+    </section>
+
+    <section class="in-depth-card">
+      <p class="section-label">{{ language() === 'bn' ? 'গভীর বিশ্লেষণ' : 'In-depth analysis' }}</p>
+      <h2>{{ copy(report.in_depth_title) }}</h2>
+      <p>{{ copy(report.in_depth_snippet) }}</p>
+      <button class="primary-button" type="button" (click)="toggleFullReport()">
+        {{ fullReportOpen() ? (language() === 'bn' ? 'সংক্ষিপ্ত করুন' : 'Close full analysis') : (language() === 'bn' ? 'পূর্ণ বিশ্লেষণ পড়ুন' : 'Read the full analysis') }}
+      </button>
+    </section>
+
+    <section class="value-card">
+      <div class="value-heading">
+        <div>
+          <p class="section-label">{{ language() === 'bn' ? 'আজকের মূল্য' : 'Value today' }}</p>
+          <div class="value-numbers">
+            <div><span>{{ language() === 'bn' ? 'আজ' : 'Today' }}</span><strong>{{ formatTaka(report.valuation.current_price) }}</strong></div>
+            <div><span>{{ language() === 'bn' ? 'আনুমানিক মূল্য' : 'Rough estimate' }}</span><strong class="estimate">{{ formatTaka(report.valuation.rough_estimate) }}</strong></div>
+          </div>
+        </div>
+        <span class="valuation-verdict" [class]="'valuation-verdict ' + report.valuation.verdict">{{ copy(report.valuation.verdict_label) }}</span>
+      </div>
+
+      @if (report.valuation.fair_range_low !== null && report.valuation.fair_range_high !== null) {
+        <div class="fair-range">
+          <meter
+            [min]="Math.min(report.valuation.current_price, report.valuation.fair_range_low) * 0.9"
+            [max]="Math.max(report.valuation.current_price, report.valuation.fair_range_high) * 1.05"
+            [low]="report.valuation.fair_range_low"
+            [high]="report.valuation.fair_range_high"
+            [optimum]="report.valuation.rough_estimate || report.valuation.current_price"
+            [value]="report.valuation.current_price"
+          ></meter>
+          <div class="range-labels">
+            <span>{{ formatTaka(report.valuation.fair_range_low) }}</span>
+            <strong>{{ language() === 'bn' ? 'ন্যায্য সীমা' : 'Fair range' }}</strong>
+            <span>{{ formatTaka(report.valuation.fair_range_high) }}</span>
+          </div>
+        </div>
+      }
+
+      <p class="valuation-summary">{{ copy(report.valuation.summary) }}</p>
+      <dl class="valuation-methods">
+        @for (method of report.valuation.methods; track method.key) {
+          <div [class.unavailable]="!method.available">
+            <dt>{{ copy(method.label) }}</dt>
+            <dd>{{ formatTaka(method.value) }}</dd>
+          </div>
+        }
+      </dl>
+      <small>{{ copy(report.disclaimer) }}</small>
+    </section>
+
+    <section class="factor-list" aria-label="Fundamental factors">
+      @for (factor of report.factors; track factor.key) {
+        <article class="factor-card" [class]="'factor-card ' + factor.status">
+          <header>
+            <div>
+              <h2>{{ copy(factor.title) }}</h2>
+              <p>{{ copy(factor.subtitle) }}</p>
+            </div>
+            <span class="factor-status">{{ factorStatus(factor.status) }}</span>
+          </header>
+          <p class="factor-explanation">{{ copy(factor.explanation) }}</p>
+          <div class="metric-list">
+            @for (metric of factor.metrics; track metric.key) {
+              <div class="metric-row">
+                <span>{{ copy(metric.label) }}</span>
+                <progress [class]="metric.score >= 7 ? 'positive-meter' : metric.score >= 4 ? 'caution-meter' : 'negative-meter'" max="10" [value]="metric.score"></progress>
+                <strong>{{ metric.display_value }} <small>{{ metric.score | number: '1.0-1' }}/10</small></strong>
+              </div>
+            }
+          </div>
+        </article>
+      }
+    </section>
+
+    @if (fullReportOpen()) {
+      <section class="full-report" id="full-analysis">
+        <header>
+          <p class="section-label">{{ language() === 'bn' ? 'সম্পূর্ণ গবেষণা' : 'Complete research' }}</p>
+          <h2>{{ report.company_name }}</h2>
+        </header>
+        <div class="report-section-grid">
+          @for (section of report.report_sections; track section.key) {
+            <article>
+              <h3>{{ copy(section.title) }}</h3>
+              <p>{{ copy(section.summary) }}</p>
+              @if (section.bullets.length) {
+                <ul>
+                  @for (bullet of section.bullets; track bullet.en) {
+                    <li>{{ copy(bullet) }}</li>
+                  }
+                </ul>
+              }
+            </article>
+          }
+        </div>
+
+        <section class="agent-evidence">
+          <h2>{{ language() === 'bn' ? 'মূল এজেন্ট প্রমাণ' : 'Original agent evidence' }}</h2>
+          <p>{{ language() === 'bn' ? 'নিচের অংশগুলো মূল মাল্টি-এজেন্ট রান থেকে অপরিবর্তিত রাখা হয়েছে।' : 'These sections are retained unchanged from the multi-agent run.' }}</p>
+          @if (report.agent_reports.final_trade_decision) {
+            <details open><summary>{{ language() === 'bn' ? 'চূড়ান্ত ট্রেড সিদ্ধান্ত' : 'Final trade decision' }}</summary><pre>{{ report.agent_reports.final_trade_decision }}</pre></details>
+          }
+          @if (report.agent_reports.fundamentals_report) {
+            <details><summary>{{ language() === 'bn' ? 'মৌলিক বিশ্লেষক' : 'Fundamentals analyst' }}</summary><pre>{{ report.agent_reports.fundamentals_report }}</pre></details>
+          }
+          @if (report.agent_reports.market_report) {
+            <details><summary>{{ language() === 'bn' ? 'বাজার বিশ্লেষক' : 'Market analyst' }}</summary><pre>{{ report.agent_reports.market_report }}</pre></details>
+          }
+          @if (report.agent_reports.news_report) {
+            <details><summary>{{ language() === 'bn' ? 'সংবাদ বিশ্লেষক' : 'News analyst' }}</summary><pre>{{ report.agent_reports.news_report }}</pre></details>
+          }
+          <details><summary>{{ language() === 'bn' ? 'পূর্ণ স্টেট লগ JSON' : 'Full state log JSON' }}</summary><pre class="json-state">{{ rawState(report) }}</pre></details>
+        </section>
+      </section>
+    }
+
+    <footer class="analysis-footer">
+      <strong>DSE AI ANALYSIS</strong>
+      <span>{{ copy(report.disclaimer) }}</span>
+    </footer>
+  }
+</main>
+}
