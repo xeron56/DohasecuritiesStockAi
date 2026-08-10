@@ -39,12 +39,20 @@ class TestLanguageInstruction:
         set_config({"output_language": "English"})
         assert get_language_instruction() == ""
 
-    def test_non_english_emits_directive(self):
+    def test_bangla_emits_bangla_script_directive(self):
         from dohasecuritiesstockai.dataflows.config import set_config
-        set_config({"output_language": "中文"})
+        set_config({"output_language": "Bangla"})
         out = get_language_instruction()
-        assert "中文" in out
+        assert "Bangla" in out
+        assert "বাংলা" in out
         assert "entire response" in out
+
+    def test_unsupported_language_is_rejected(self):
+        from dohasecuritiesstockai.dataflows.config import set_config
+
+        set_config({"output_language": "Chinese"})
+        with pytest.raises(ValueError, match="English or Bangla"):
+            get_language_instruction()
 
 
 @pytest.mark.unit

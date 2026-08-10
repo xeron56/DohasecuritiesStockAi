@@ -1,6 +1,4 @@
-"""OpenRouter model selection: prompts are labeled by mode (#1000); required
-prompts exit cleanly on cancel; the output-language prompt defaults to English
-on cancel; and the OpenRouter list is newest-first."""
+"""OpenRouter and output-language selection behavior."""
 
 from unittest import mock
 
@@ -111,12 +109,23 @@ class TestCancelExitsCleanly:
 
 
 @pytest.mark.unit
-class TestLanguageDefaultsToEnglish:
+class TestOutputLanguage:
     def test_select_cancel_defaults_english(self):
         with mock.patch.object(utils.questionary, "select", return_value=_asks(None)):
             assert utils.ask_output_language() == "English"
 
-    def test_custom_language_cancel_defaults_english(self):
-        with mock.patch.object(utils.questionary, "select", return_value=_asks("custom")), \
-             mock.patch.object(utils.questionary, "text", return_value=_asks(None)):
-            assert utils.ask_output_language() == "English"
+    def test_selector_only_offers_english_and_bangla(self):
+        captured = {}
+
+        def fake_select(message, **kwargs):
+            captured["message"] = message
+            captured["labels"] = [choice.title for choice in kwargs["choices"]]
+            captured["values"] = [choice.value for choice in kwargs["choices"]]
+            return _asks("Bangla")
+
+        with mock.patch.object(utils.questionary, "select", side_effect=fake_select):
+            assert utils.ask_output_language() == "Bangla"
+
+        assert captured["message"] == "Select Output Language:"
+        assert captured["values"] == ["English", "Bangla"]
+        assert captured["labels"] == ["English (default)", "Bangla (বাংলা)"]

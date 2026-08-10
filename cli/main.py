@@ -19,7 +19,6 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
-from cli.announcements import display_announcements, fetch_announcements
 from cli.stats_handler import StatsCallbackHandler
 from cli.utils import (
     ask_anthropic_effort,
@@ -523,8 +522,7 @@ def get_user_selections():
     welcome_content += f"[bold green]{PRODUCT_DISPLAY_NAME}[/bold green]\n"
     welcome_content += f"[dim]{PRODUCT_TAGLINE}[/dim]\n\n"
     welcome_content += "[bold]Workflow Steps:[/bold]\n"
-    welcome_content += "I. Analyst Team → II. Research Team → III. Trader → IV. Risk Management → V. Portfolio Management\n\n"
-    welcome_content += "[dim]Powered by the TradingAgents framework[/dim]"
+    welcome_content += "I. Analyst Team → II. Research Team → III. Trader → IV. Risk Management → V. Portfolio Management"
 
     # Create and center the welcome box
     welcome_box = Panel(
@@ -536,11 +534,6 @@ def get_user_selections():
     )
     console.print(Align.center(welcome_box))
     console.print()
-    console.print()  # Add vertical space before announcements
-
-    # Fetch and display announcements (silent on failure)
-    announcements = fetch_announcements()
-    display_announcements(console, announcements)
 
     # Create a boxed questionnaire for each step
     def create_question_box(title, prompt, default=None):

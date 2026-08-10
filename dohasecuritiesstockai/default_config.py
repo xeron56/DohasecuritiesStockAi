@@ -1,5 +1,7 @@
 import os
 
+from dohasecuritiesstockai.languages import normalize_output_language
+
 # Keep the established data directory so the package rename does not orphan
 # existing reports, checkpoints, caches, or the trading-memory log.
 _TRADINGAGENTS_HOME = os.path.join(os.path.expanduser("~"), ".tradingagents")
@@ -72,7 +74,10 @@ def _apply_env_overrides(config: dict) -> dict:
         if raw is None or raw == "":
             continue
         try:
-            config[key] = _coerce(raw, config.get(key))
+            value = _coerce(raw, config.get(key))
+            if key == "output_language":
+                value = normalize_output_language(value)
+            config[key] = value
         except ValueError as exc:
             raise ValueError(f"Invalid value for {env_var}: {exc}") from exc
     return config

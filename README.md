@@ -217,7 +217,7 @@ The CLI asks for:
 
 1. DSE ticker.
 2. Analysis date.
-3. Output language.
+3. Output language: English or Bangla (`বাংলা`).
 4. Analyst selection.
 5. Research/debate depth.
 6. LLM provider and models.

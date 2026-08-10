@@ -7,6 +7,7 @@ from rich.console import Console
 
 from cli.models import AnalystType, AssetType
 from dohasecuritiesstockai.default_config import DEFAULT_CONFIG
+from dohasecuritiesstockai.languages import OUTPUT_LANGUAGE_CHOICES
 from dohasecuritiesstockai.llm_clients.api_key_env import get_api_key_env
 from dohasecuritiesstockai.llm_clients.model_catalog import get_model_options
 
@@ -681,22 +682,12 @@ def ensure_api_key(provider: str) -> str | None:
 
 
 def ask_output_language() -> str:
-    """Ask for report output language."""
+    """Ask for the English or Bangla report-output language."""
     choice = questionary.select(
         "Select Output Language:",
         choices=[
-            questionary.Choice("English (default)", "English"),
-            questionary.Choice("Chinese (中文)", "Chinese"),
-            questionary.Choice("Japanese (日本語)", "Japanese"),
-            questionary.Choice("Korean (한국어)", "Korean"),
-            questionary.Choice("Hindi (हिन्दी)", "Hindi"),
-            questionary.Choice("Spanish (Español)", "Spanish"),
-            questionary.Choice("Portuguese (Português)", "Portuguese"),
-            questionary.Choice("French (Français)", "French"),
-            questionary.Choice("German (Deutsch)", "German"),
-            questionary.Choice("Arabic (العربية)", "Arabic"),
-            questionary.Choice("Russian (Русский)", "Russian"),
-            questionary.Choice("Custom language", "custom"),
+            questionary.Choice(label, value)
+            for label, value in OUTPUT_LANGUAGE_CHOICES
         ],
         style=questionary.Style([
             ("selected", "fg:yellow noinherit"),
@@ -709,10 +700,4 @@ def ask_output_language() -> str:
     # rather than exiting the run (unlike the required model/provider prompts).
     if choice is None:
         return "English"
-    if choice == "custom":
-        return (questionary.text(
-            "Enter language name (e.g. Turkish, Vietnamese, Thai, Indonesian):",
-            validate=lambda x: len(x.strip()) > 0 or "Please enter a language name.",
-        ).ask() or "").strip() or "English"
-
     return choice

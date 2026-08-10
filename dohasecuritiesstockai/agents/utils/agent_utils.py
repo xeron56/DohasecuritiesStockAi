@@ -61,10 +61,15 @@ def get_language_instruction() -> str:
     report rather than a mix of languages.
     """
     from dohasecuritiesstockai.dataflows.config import get_config
-    lang = get_config().get("output_language", "English")
-    if lang.strip().lower() == "english":
+    from dohasecuritiesstockai.languages import normalize_output_language
+
+    language = normalize_output_language(get_config().get("output_language", "English"))
+    if language == "English":
         return ""
-    return f" Write your entire response in {lang}."
+    return (
+        " Write your entire response in natural Bangla using বাংলা script."
+        " Keep ticker symbols, standard financial abbreviations, and numeric values unchanged."
+    )
 
 
 def _clean_identity_value(value: Any) -> str | None:
@@ -219,4 +224,3 @@ def create_msg_delete():
         return {"messages": removal_operations + [placeholder]}
 
     return delete_messages
-

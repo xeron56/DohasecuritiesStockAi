@@ -40,7 +40,7 @@ _RSS = "https://www.reddit.com/r/{sub}/search.rss?{qs}"
 # blocks generic/anonymous tokens like bare "Mozilla/5.0" or "curl/…" but
 # serves this one on both endpoints; the RSS feed accepts it even when the
 # JSON search endpoint 403s, so no browser-spoofing is needed.
-_UA = "dohasecuritiesstockai/0.2 (+https://github.com/TauricResearch/TradingAgents)"
+_UA = "dohasecuritiesstockai/0.2 (+https://github.com/xeron56/DohasecuritiesStockAi)"
 _ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
 
 # Default subreddits ordered roughly by signal density for ticker-specific

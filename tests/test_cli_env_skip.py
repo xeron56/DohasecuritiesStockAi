@@ -40,7 +40,7 @@ class TestCliSkipsPromptsFromEnv(unittest.TestCase):
             "TRADINGAGENTS_DEEP_THINK_LLM": "kimi-k2.5",
             "TRADINGAGENTS_QUICK_THINK_LLM": "deepseek-v4-pro",
             "TRADINGAGENTS_LLM_BACKEND_URL": "https://opencode.ai/zen/go/v1",
-            "TRADINGAGENTS_OUTPUT_LANGUAGE": "Japanese",
+            "TRADINGAGENTS_OUTPUT_LANGUAGE": "Bangla",
         }
         fake_cfg = dict(m.DEFAULT_CONFIG)
         fake_cfg.update({
@@ -48,13 +48,11 @@ class TestCliSkipsPromptsFromEnv(unittest.TestCase):
             "backend_url": "https://opencode.ai/zen/go/v1",
             "quick_think_llm": "deepseek-v4-pro",
             "deep_think_llm": "kimi-k2.5",
-            "output_language": "Japanese",
+            "output_language": "Bangla",
         })
 
         with mock.patch.dict(os.environ, env, clear=False), \
              mock.patch.object(m, "DEFAULT_CONFIG", fake_cfg), \
-             mock.patch.object(m, "fetch_announcements", return_value=None), \
-             mock.patch.object(m, "display_announcements"), \
              mock.patch.object(m, "get_ticker", return_value="AAPL"), \
              mock.patch.object(m, "get_analysis_date", return_value="2026-05-29"), \
              mock.patch.object(m, "select_analysts", return_value=[]), \
@@ -79,7 +77,7 @@ class TestCliSkipsPromptsFromEnv(unittest.TestCase):
         self.assertEqual(sel["backend_url"], "https://opencode.ai/zen/go/v1")
         self.assertEqual(sel["shallow_thinker"], "deepseek-v4-pro")
         self.assertEqual(sel["deep_thinker"], "kimi-k2.5")
-        self.assertEqual(sel["output_language"], "Japanese")
+        self.assertEqual(sel["output_language"], "Bangla")
 
 
 @pytest.mark.unit
@@ -96,8 +94,6 @@ class TestResearchDepthSkippedFromEnv(unittest.TestCase):
 
         with mock.patch.dict(os.environ, env, clear=False), \
              mock.patch.object(m, "DEFAULT_CONFIG", fake_cfg), \
-             mock.patch.object(m, "fetch_announcements", return_value=None), \
-             mock.patch.object(m, "display_announcements"), \
              mock.patch.object(m, "get_ticker", return_value="AAPL"), \
              mock.patch.object(m, "get_analysis_date", return_value="2026-05-29"), \
              mock.patch.object(m, "select_analysts", return_value=[]), \
@@ -126,8 +122,6 @@ class TestReasoningEffortSkippedFromEnv(unittest.TestCase):
 
         with mock.patch.dict(os.environ, env, clear=False), \
              mock.patch.object(m, "DEFAULT_CONFIG", fake_cfg), \
-             mock.patch.object(m, "fetch_announcements", return_value=None), \
-             mock.patch.object(m, "display_announcements"), \
              mock.patch.object(m, "get_ticker", return_value="AAPL"), \
              mock.patch.object(m, "get_analysis_date", return_value="2026-05-29"), \
              mock.patch.object(m, "select_analysts", return_value=[]), \
