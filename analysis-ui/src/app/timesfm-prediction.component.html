@@ -1,6 +1,6 @@
 <main class="prediction-page">
   <header class="prediction-toolbar">
-    <a class="brand" href="/?view=timesfm" aria-label="TimesFM forecast home">
+    <a class="brand" href="/?view=timesfm" aria-label="Forecast home">
       <span class="brand-mark">T</span>
       <span>TRADINGAGENTS <strong>FORECAST LAB</strong></span>
     </a>
@@ -13,7 +13,7 @@
   @if (loading()) {
     <section class="loading-state" aria-live="polite">
       <span class="loader"></span>
-      <h1>Loading TimesFM prediction</h1>
+      <h1>Loading market prediction</h1>
       <p>Reading the saved backtest and chart series…</p>
     </section>
   }
@@ -23,14 +23,14 @@
       <span class="eyebrow">NO PREDICTION RUN</span>
       <h1>Generate the forecast first.</h1>
       <p>{{ errorMessage() }}</p>
-      <code>tradingagents-predict "BXPHARMA'PB" --resolution 1d --open-ui</code>
+      <code>dohasecuritiesstockai-dgt-predict GP --resolution 1d --open-ui</code>
     </section>
   }
 
   @if (result(); as report) {
     <section class="hero">
       <div>
-        <p class="eyebrow">TIMESFM {{ report.model.version }} · ZERO-SHOT PRICE FORECAST</p>
+        <p class="eyebrow">{{ report.model.name | uppercase }} {{ report.model.version }} · PRICE FORECAST</p>
         <div class="symbol-line">
           <h1>{{ report.symbol }}</h1>
           <span>{{ report.data.resolution_label }}</span>
@@ -44,7 +44,7 @@
       <article class="accuracy-card">
         <span>Holdout accuracy</span>
         <strong>{{ report.metrics.accuracy_score | number: '1.1-2' }}<small>%</small></strong>
-        <p>100 − sMAPE across the full hidden half</p>
+        <p>100 − sMAPE across the full hidden holdout</p>
       </article>
     </section>
 
@@ -80,7 +80,7 @@
       <header>
         <div>
           <p class="eyebrow">HISTORICAL BACKTEST + FORWARD PATH</p>
-          <h2>Actual candles against TimesFM</h2>
+          <h2>Actual candles against {{ report.model.name }}</h2>
         </div>
         <div class="legend" aria-label="Chart legend">
           <span><i class="candle"></i>Actual OHLC</span>
@@ -89,7 +89,7 @@
           <span><i class="live"></i>Live actual</span>
         </div>
       </header>
-      <div #predictionChart class="prediction-chart" role="img" aria-label="DSE actual and TimesFM forecast chart"></div>
+      <div #predictionChart class="prediction-chart" role="img" [attr.aria-label]="'DSE actual and ' + report.model.name + ' forecast chart'"></div>
       <footer>
         <span>Context</span>
         <strong>{{ report.data.first_timestamp | date: 'mediumDate' }} → {{ report.history[report.data.context_points - 1].time | date: 'mediumDate' }}</strong>

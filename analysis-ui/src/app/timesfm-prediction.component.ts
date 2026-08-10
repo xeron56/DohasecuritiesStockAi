@@ -70,7 +70,7 @@ export class TimesFmPredictionComponent
   ) {}
 
   ngOnInit(): void {
-    this.titleService.setTitle('TimesFM Stock Forecast');
+    this.titleService.setTitle('DSE Stock Forecast');
     const query = new URLSearchParams(window.location.search);
     const runId = query.get('run')?.trim();
     const symbol = query.get('symbol')?.trim().toUpperCase();
@@ -82,6 +82,7 @@ export class TimesFmPredictionComponent
       request.subscribe({
         next: (result) => {
           this.result.set(result);
+          this.titleService.setTitle(`${result.model.name} · ${result.symbol}`);
           this.loading.set(false);
           this.errorMessage.set('');
           setTimeout(() => this.renderChart());
@@ -90,7 +91,7 @@ export class TimesFmPredictionComponent
         error: () => {
           this.loading.set(false);
           this.errorMessage.set(
-            'Prediction data is not available. Run tradingagents-predict first.',
+            'Prediction data is not available. Run a forecasting command first.',
           );
           this.liveStatus.set('offline');
         },

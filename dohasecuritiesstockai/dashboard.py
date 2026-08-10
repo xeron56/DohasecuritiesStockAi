@@ -116,7 +116,7 @@ def dashboard_url(host: str, port: int, symbol: str, analysis_date: date | str) 
 
 
 def prediction_dashboard_url(host: str, port: int, run_id: str) -> str:
-    """Return the standalone Angular URL for one TimesFM prediction run."""
+    """Return the standalone Angular URL for one prediction run."""
 
     browser_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
     query = urlencode({"view": "timesfm", "run": run_id})
@@ -188,7 +188,7 @@ def launch_prediction_dashboard(
     host: str | None = None,
     port: int | None = None,
 ) -> str:
-    """Build, serve, and open the standalone TimesFM Angular result screen."""
+    """Build, serve, and open the standalone forecast result screen."""
 
     resolved_host = host or os.environ.get("TRADINGAGENTS_API_HOST", "127.0.0.1")
     resolved_port = port or int(os.environ.get("TRADINGAGENTS_API_PORT", "8000"))

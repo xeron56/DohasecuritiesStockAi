@@ -412,6 +412,30 @@ and skill versus a last-price baseline. A positive-looking headline metric does
 not prove useful predictive skill; compare the forecast with the reported naive
 baseline before relying on it.
 
+### Differential Graph Transformer forecasting
+
+The DGT command uses the same authenticated DSE candle service and the same
+prediction dashboard. Unlike TimesFM, it trains a small model for each run and
+can learn from a target stock plus related DSE securities. It saves a real vs.
+predicted holdout CSV, a future CSV, a chart, and a reusable PyTorch checkpoint.
+
+```bash
+pip install -e '.[dgt]'
+
+dohasecuritiesstockai-dgt-predict GP \
+  --resolution 1d \
+  --lookback 2y \
+  --peers DSEX,BRACBANK,SQURPHARMA \
+  --future-steps 12 \
+  --open-ui
+```
+
+The evaluation graph, scaler, and model use only data before the validation and
+holdout periods. The holdout forecast is recursive, so its real-price comparison
+has no future-price leakage. After scoring, a separate deployment model is refit
+on all available real bars for the future forecast; use `--no-refit` to disable
+that final step.
+
 ## Important limitations
 
 - LLM output is non-deterministic and can differ between otherwise identical

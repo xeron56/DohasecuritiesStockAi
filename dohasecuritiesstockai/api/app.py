@@ -114,7 +114,7 @@ def create_app() -> FastAPI:
         if result is None:
             raise HTTPException(
                 status_code=404,
-                detail="No TimesFM prediction run matches this request.",
+                detail="No prediction run matches this request.",
             )
         return result
 

@@ -1,4 +1,4 @@
-"""Filesystem persistence for chart-ready TimesFM prediction runs."""
+"""Filesystem persistence for chart-ready prediction runs."""
 
 from __future__ import annotations
 

@@ -51,6 +51,10 @@ timesfm = [
     "einshape>=1.0.0",
     "utilsforecast>=0.1.10",
 ]
+dgt = [
+    "torch>=2.2.0",
+    "matplotlib>=3.8.0",
+]
 
 [project.scripts]
 # Product commands plus legacy executable aliases for existing scripts.
@@ -61,6 +65,7 @@ dohasecuritiesstockai-api = "dohasecuritiesstockai.api.__main__:main"
 tradingagents-api = "dohasecuritiesstockai.api.__main__:main"
 dohasecuritiesstockai-predict = "dohasecuritiesstockai.timesfm_forecasting.cli:main"
 tradingagents-predict = "dohasecuritiesstockai.timesfm_forecasting.cli:main"
+dohasecuritiesstockai-dgt-predict = "dohasecuritiesstockai.dgt_forecasting.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["dohasecuritiesstockai*", "cli*"]
