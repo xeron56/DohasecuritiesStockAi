@@ -79,24 +79,88 @@
     <section class="chart-card">
       <header>
         <div>
-          <p class="eyebrow">HISTORICAL BACKTEST + FORWARD PATH</p>
-          <h2>Actual candles against {{ report.model.name }}</h2>
+          <p class="eyebrow">{{ chartMode() === 'future' ? 'FORWARD FORECAST' : 'HISTORICAL BACKTEST' }}</p>
+          <h2>
+            {{ chartMode() === 'future'
+              ? 'Recent actual candles + ' + report.model.name + ' future'
+              : 'Hidden actuals against ' + report.model.name + ' backtest' }}
+          </h2>
         </div>
-        <div class="legend" aria-label="Chart legend">
-          <span><i class="candle"></i>Actual OHLC</span>
-          <span><i class="backtest"></i>Held-out prediction</span>
-          <span><i class="future"></i>Future forecast</span>
-          <span><i class="live"></i>Live actual</span>
+        <div class="chart-controls">
+          <div class="chart-mode-switch" role="group" aria-label="Forecast chart view">
+            <button
+              type="button"
+              [attr.aria-pressed]="chartMode() === 'future'"
+              [class.active]="chartMode() === 'future'"
+              (click)="selectChartMode('future')"
+            >Future forecast</button>
+            <button
+              type="button"
+              [attr.aria-pressed]="chartMode() === 'backtest'"
+              [class.active]="chartMode() === 'backtest'"
+              (click)="selectChartMode('backtest')"
+            >Backtest</button>
+          </div>
+          <div class="legend" aria-label="Chart legend">
+            @if (chartMode() === 'future') {
+              <span><i class="candle"></i>Actual OHLC</span>
+              <span><i class="future"></i>Future forecast</span>
+              @if (showFutureInterval()) {
+                <span><i class="interval future-interval"></i>Q10–Q90</span>
+              }
+              <span><i class="live"></i>Live actual</span>
+            } @else {
+              <span><i class="actual-line"></i>Actual close</span>
+              <span><i class="backtest"></i>Backtest prediction</span>
+              @if (showBacktestInterval()) {
+                <span><i class="interval"></i>Q10–Q90</span>
+              }
+            }
+          </div>
         </div>
       </header>
-      <div #predictionChart class="prediction-chart" role="img" [attr.aria-label]="'DSE actual and ' + report.model.name + ' forecast chart'"></div>
+      <div class="chart-context-note">
+        <p>
+          @if (chartMode() === 'future') {
+            Uses the latest real prices. The separate historical backtest is excluded from this scale.
+          } @else {
+            The model uses the first {{ report.data.context_points | number }} bars as context, then predicts all
+            {{ report.data.holdout_points | number }} hidden bars. Compare predicted and actual closing prices directly.
+          }
+        </p>
+        <button
+          type="button"
+          class="interval-toggle"
+          [class.active]="intervalVisible()"
+          [attr.aria-pressed]="intervalVisible()"
+          (click)="toggleInterval()"
+        >{{ intervalVisible() ? 'Hide' : 'Show' }} 80% uncertainty</button>
+      </div>
+      <div
+        #predictionChart
+        id="prediction-chart"
+        class="prediction-chart"
+        role="img"
+        [attr.aria-label]="chartMode() === 'future'
+          ? 'Recent DSE actual prices and ' + report.model.name + ' future forecast chart'
+          : 'DSE hidden actual prices and ' + report.model.name + ' historical backtest chart'"
+      ></div>
       <footer>
-        <span>Context</span>
-        <strong>{{ report.data.first_timestamp | date: 'mediumDate' }} → {{ report.history[report.data.context_points - 1].time | date: 'mediumDate' }}</strong>
-        <span>Hidden test</span>
-        <strong>{{ report.backtest[0].time | date: 'mediumDate' }} → {{ report.data.last_timestamp | date: 'mediumDate' }}</strong>
-        <span>Next forecast</span>
-        <strong>{{ report.future.length }} bars</strong>
+        @if (chartMode() === 'future') {
+          <span>Recent actual</span>
+          <strong>{{ futureHistoryStart(report) | date: 'mediumDate' }} → {{ report.data.last_timestamp | date: 'mediumDate' }}</strong>
+          <span>Forecast window</span>
+          <strong>{{ report.future[0].time | date: 'mediumDate' }} → {{ report.future[report.future.length - 1].time | date: 'mediumDate' }}</strong>
+          <span>Horizon</span>
+          <strong>{{ report.future.length }} bars</strong>
+        } @else {
+          <span>Model context</span>
+          <strong>{{ report.data.first_timestamp | date: 'mediumDate' }} → {{ report.history[report.data.context_points - 1].time | date: 'mediumDate' }}</strong>
+          <span>Line comparison</span>
+          <strong>{{ report.backtest[0].time | date: 'mediumDate' }} → {{ report.data.last_timestamp | date: 'mediumDate' }}</strong>
+          <span>Scored bars</span>
+          <strong>{{ report.backtest.length }}</strong>
+        }
       </footer>
     </section>
 

@@ -32,6 +32,10 @@ import {
 } from './timesfm-prediction.model';
 import { TimesFmPredictionService } from './timesfm-prediction.service';
 
+type PredictionChartMode = 'future' | 'backtest';
+
+const FUTURE_HISTORY_BARS = 30;
+
 @Component({
   selector: 'app-timesfm-prediction',
   standalone: true,
@@ -51,13 +55,15 @@ export class TimesFmPredictionComponent
   );
   readonly livePrice = signal<number | null>(null);
   readonly liveMatches = signal<LiveForecastMatch[]>([]);
+  readonly chartMode = signal<PredictionChartMode>('future');
+  readonly showFutureInterval = signal(false);
+  readonly showBacktestInterval = signal(false);
   readonly latestLiveMatch = computed(() => this.liveMatches().at(-1) ?? null);
   readonly recentBacktest = computed(() => this.result()?.backtest.slice(-12) ?? []);
   readonly subscriptions: Subscription[] = [];
 
   private chart: IChartApi | null = null;
   private liveSeries: ISeriesApi<'Line'> | null = null;
-  private resizeObserver: ResizeObserver | null = null;
   private stompClient: Client | null = null;
   private chartReady = false;
 
@@ -107,7 +113,6 @@ export class TimesFmPredictionComponent
   ngOnDestroy(): void {
     this.subscriptions.forEach((subscription) => subscription.unsubscribe());
     void this.stompClient?.deactivate();
-    this.resizeObserver?.disconnect();
     this.chart?.remove();
   }
 
@@ -133,13 +138,38 @@ export class TimesFmPredictionComponent
     return point.time;
   }
 
+  selectChartMode(mode: PredictionChartMode): void {
+    if (this.chartMode() === mode) return;
+    this.chartMode.set(mode);
+    this.renderChart();
+  }
+
+  toggleInterval(): void {
+    if (this.chartMode() === 'future') {
+      this.showFutureInterval.update((visible) => !visible);
+    } else {
+      this.showBacktestInterval.update((visible) => !visible);
+    }
+    this.renderChart();
+  }
+
+  intervalVisible(): boolean {
+    return this.chartMode() === 'future'
+      ? this.showFutureInterval()
+      : this.showBacktestInterval();
+  }
+
+  futureHistoryStart(result: TimesFmPredictionResult): string {
+    return result.history.at(-FUTURE_HISTORY_BARS)?.time ?? result.data.first_timestamp;
+  }
+
   private renderChart(): void {
     const result = this.result();
     const container = this.chartContainer?.nativeElement;
     if (!result || !container || !this.chartReady) return;
 
-    this.resizeObserver?.disconnect();
     this.chart?.remove();
+    this.liveSeries = null;
     this.chart = createChart(container, {
       autoSize: true,
       height: 520,
@@ -164,15 +194,24 @@ export class TimesFmPredictionComponent
       },
     });
 
-    const candles = this.chart.addCandlestickSeries({
+    if (this.chartMode() === 'future') {
+      this.renderFutureSeries(result);
+    } else {
+      this.renderBacktestSeries(result);
+    }
+    this.chart.timeScale().fitContent();
+  }
+
+  private renderFutureSeries(result: TimesFmPredictionResult): void {
+    const candles = this.chart?.addCandlestickSeries({
       upColor: '#34d399',
       downColor: '#f87171',
       borderVisible: false,
       wickUpColor: '#34d399',
       wickDownColor: '#f87171',
     });
-    candles.setData(
-      result.history.map((point) => ({
+    candles?.setData(
+      result.history.slice(-FUTURE_HISTORY_BARS).map((point) => ({
         time: this.chartTime(point.time),
         open: point.open,
         high: point.high,
@@ -181,49 +220,7 @@ export class TimesFmPredictionComponent
       })),
     );
 
-    const predicted = this.chart.addLineSeries({
-      color: '#f59e0b',
-      lineWidth: 2,
-      title: 'Held-out prediction',
-      priceLineVisible: false,
-    });
-    predicted.setData(
-      result.backtest.map((point) => ({
-        time: this.chartTime(point.time),
-        value: point.predicted,
-      })),
-    );
-
-    const lower = this.chart.addLineSeries({
-      color: 'rgba(245, 158, 11, 0.48)',
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      title: 'Q10',
-      priceLineVisible: false,
-      lastValueVisible: false,
-    });
-    const upper = this.chart.addLineSeries({
-      color: 'rgba(245, 158, 11, 0.48)',
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      title: 'Q90',
-      priceLineVisible: false,
-      lastValueVisible: false,
-    });
-    lower.setData(
-      result.backtest.map((point) => ({
-        time: this.chartTime(point.time),
-        value: point.q10,
-      })),
-    );
-    upper.setData(
-      result.backtest.map((point) => ({
-        time: this.chartTime(point.time),
-        value: point.q90,
-      })),
-    );
-
-    const future = this.chart.addLineSeries({
+    const future = this.chart?.addLineSeries({
       color: '#a78bfa',
       lineWidth: 3,
       lineStyle: LineStyle.Dashed,
@@ -231,7 +228,7 @@ export class TimesFmPredictionComponent
       priceLineVisible: false,
     });
     const futureStart = result.history.at(-1);
-    future.setData([
+    future?.setData([
       ...(futureStart
         ? [
             {
@@ -246,16 +243,91 @@ export class TimesFmPredictionComponent
       })),
     ]);
 
-    this.liveSeries = this.chart.addLineSeries({
-      color: '#22d3ee',
-      lineWidth: 2,
-      title: 'Live actual',
-      priceLineVisible: true,
-      lastValueVisible: true,
+    if (this.showFutureInterval()) {
+      this.addIntervalSeries(result.future, '#a78bfa');
+    }
+
+    this.liveSeries =
+      this.chart?.addLineSeries({
+        color: '#22d3ee',
+        lineWidth: 2,
+        title: 'Live actual',
+        priceLineVisible: true,
+        lastValueVisible: true,
+      }) ?? null;
+    const latestMatch = this.latestLiveMatch();
+    if (latestMatch) {
+      this.liveSeries?.update({
+        time: this.chartTime(latestMatch.targetTime),
+        value: latestMatch.actual,
+      });
+    }
+  }
+
+  private renderBacktestSeries(result: TimesFmPredictionResult): void {
+    const contextEnd = result.history[result.data.context_points - 1];
+    const anchor = contextEnd
+      ? [{ time: this.chartTime(contextEnd.time), value: contextEnd.close }]
+      : [];
+
+    const actual = this.chart?.addLineSeries({
+      color: '#34d399',
+      lineWidth: 3,
+      title: 'Actual close',
+      priceLineVisible: false,
     });
-    this.chart.timeScale().fitContent();
-    this.resizeObserver = new ResizeObserver(() => this.chart?.timeScale().fitContent());
-    this.resizeObserver.observe(container);
+    actual?.setData([
+      ...anchor,
+      ...result.backtest.map((point) => ({
+        time: this.chartTime(point.time),
+        value: point.actual,
+      })),
+    ]);
+
+    const predicted = this.chart?.addLineSeries({
+      color: '#f59e0b',
+      lineWidth: 3,
+      lineStyle: LineStyle.Dashed,
+      title: 'Backtest prediction',
+      priceLineVisible: false,
+    });
+    predicted?.setData([
+      ...anchor,
+      ...result.backtest.map((point) => ({
+        time: this.chartTime(point.time),
+        value: point.predicted,
+      })),
+    ]);
+    if (this.showBacktestInterval()) {
+      this.addIntervalSeries(result.backtest, '#f59e0b');
+    }
+  }
+
+  private addIntervalSeries(
+    points: Array<{ time: string; q10: number; q90: number }>,
+    color: string,
+  ): void {
+    const intervalOptions = {
+      color,
+      lineWidth: 1 as const,
+      lineStyle: LineStyle.Dashed,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    };
+    const lower = this.chart?.addLineSeries({ ...intervalOptions, title: 'Q10' });
+    const upper = this.chart?.addLineSeries({ ...intervalOptions, title: 'Q90' });
+    lower?.setData(
+      points.map((point) => ({
+        time: this.chartTime(point.time),
+        value: point.q10,
+      })),
+    );
+    upper?.setData(
+      points.map((point) => ({
+        time: this.chartTime(point.time),
+        value: point.q90,
+      })),
+    );
   }
 
   private connectLiveFeed(result: TimesFmPredictionResult): void {

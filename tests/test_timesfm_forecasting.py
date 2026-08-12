@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from dohasecuritiesstockai.timesfm_forecasting.cli import _lookback_start
+from dohasecuritiesstockai.timesfm_forecasting.forecaster import _cuda_device_is_supported
 from dohasecuritiesstockai.timesfm_forecasting.market_data import (
     MarketCandle,
     fetch_dse_candles,
@@ -46,6 +47,27 @@ class LinearForecastBackend:
         for index in range(1, 10):
             quantiles[:, index] = point + (index - 5) * 0.1
         return point, quantiles, 1
+
+
+class FakeCuda:
+    def __init__(self, *, available: bool, capability=(0, 0), arches=()):
+        self.available = available
+        self.capability = capability
+        self.arches = list(arches)
+
+    def is_available(self):
+        return self.available
+
+    def get_device_capability(self, _device_index):
+        return self.capability
+
+    def get_arch_list(self):
+        return self.arches
+
+
+class FakeTorch:
+    def __init__(self, cuda):
+        self.cuda = cuda
 
 
 def _linear_candles(count: int) -> list[MarketCandle]:
@@ -89,6 +111,36 @@ def test_lookback_is_separate_from_candle_resolution():
     assert _lookback_start(datetime(2026, 8, 10).date(), "1y") == datetime(2025, 8, 10).date()
     assert _lookback_start(datetime(2024, 3, 31).date(), "1mo") == datetime(2024, 2, 29).date()
     assert _lookback_start(datetime(2026, 8, 10).date(), "max") is None
+
+
+def test_timesfm_rejects_cuda_device_older_than_compiled_pytorch_arches():
+    torch = FakeTorch(
+        FakeCuda(
+            available=True,
+            capability=(6, 0),
+            arches=("sm_70", "sm_75", "sm_80", "sm_86", "sm_90"),
+        )
+    )
+
+    assert not _cuda_device_is_supported(torch)
+
+
+def test_timesfm_accepts_compatible_cuda_cubin_or_forward_compatible_ptx():
+    same_major = FakeTorch(
+        FakeCuda(available=True, capability=(8, 9), arches=("sm_80", "sm_86"))
+    )
+    forward_ptx = FakeTorch(
+        FakeCuda(available=True, capability=(9, 0), arches=("sm_86", "compute_86"))
+    )
+
+    assert _cuda_device_is_supported(same_major)
+    assert _cuda_device_is_supported(forward_ptx)
+
+
+def test_timesfm_treats_cuda_as_unavailable_when_pytorch_does():
+    torch = FakeTorch(FakeCuda(available=False))
+
+    assert not _cuda_device_is_supported(torch)
 
 
 def test_fetch_dse_candles_normalizes_envelope_and_ohlcv_arrays():

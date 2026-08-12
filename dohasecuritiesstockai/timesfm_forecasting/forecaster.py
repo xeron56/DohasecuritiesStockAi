@@ -8,6 +8,7 @@ import io
 import math
 import os
 import sys
+import warnings
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -82,6 +83,44 @@ def _load_archived_timesfm() -> ModuleType:
     return module
 
 
+def _cuda_device_is_supported(torch: ModuleType, device_index: int = 0) -> bool:
+    """Return whether this PyTorch build contains code usable by the CUDA device."""
+
+    if not torch.cuda.is_available():
+        return False
+
+    compiled_arches = torch.cuda.get_arch_list()
+    if not compiled_arches:
+        # ROCm builds and some custom CUDA builds do not expose an architecture
+        # list. In that case availability is the best signal PyTorch provides.
+        return True
+
+    device_major, device_minor = torch.cuda.get_device_capability(device_index)
+    device_arch = device_major * 10 + device_minor
+    sm_arches: list[int] = []
+    ptx_arches: list[int] = []
+    for arch in compiled_arches:
+        kind, separator, version = arch.partition("_")
+        if not separator:
+            continue
+        numeric_version = "".join(character for character in version if character.isdigit())
+        if not numeric_version:
+            continue
+        if kind == "sm":
+            sm_arches.append(int(numeric_version))
+        elif kind == "compute":
+            ptx_arches.append(int(numeric_version))
+
+    # CUDA cubins are compatible with later minor revisions in the same major
+    # architecture. PTX can be JIT-compiled for newer CUDA architectures.
+    if any(
+        compiled // 10 == device_arch // 10 and compiled <= device_arch
+        for compiled in sm_arches
+    ):
+        return True
+    return any(compiled <= device_arch for compiled in ptx_arches)
+
+
 class TimesFMBackend:
     """One TimesFM 2.0 500M model instance configured for one prediction run."""
 
@@ -111,7 +150,24 @@ class TimesFMBackend:
             ) from exc
 
         timesfm = _load_archived_timesfm()
-        use_cuda = torch.cuda.is_available()
+        gpu_name = None
+        with warnings.catch_warnings():
+            # PyTorch emits several long compatibility warnings while querying
+            # an unsupported device. Replace them with one actionable warning.
+            warnings.simplefilter("ignore", UserWarning)
+            cuda_available = torch.cuda.is_available()
+            if cuda_available:
+                gpu_name = torch.cuda.get_device_name(0)
+            use_cuda = _cuda_device_is_supported(torch)
+            capability = torch.cuda.get_device_capability(0) if cuda_available else None
+        if cuda_available and not use_cuda:
+            device_arch = f"sm_{capability[0]}{capability[1]}" if capability else "unknown"
+            warnings.warn(
+                f"{gpu_name or 'CUDA device'} ({device_arch}) is not supported by this "
+                "PyTorch build; TimesFM is using the CPU instead.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
         torch.set_float32_matmul_precision("high")
 
         desired_context = max(INPUT_PATCH, min(context_points, MODEL_CONTEXT_LIMIT))
@@ -138,7 +194,7 @@ class TimesFMBackend:
         )
         if use_cuda:
             self.device = "cuda:0"
-            self.gpu_name = torch.cuda.get_device_name(0)
+            self.gpu_name = gpu_name
         else:
             self.device = "cpu"
             self.gpu_name = None

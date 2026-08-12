@@ -1,0 +1,342 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "Why GP's TimesFM backtest went flat",
+    "description": "Technical diagnosis of the nearly flat GP daily forecast, its accuracy metrics, GPU status, and model-improvement options.",
+    "generatedAt": "2026-08-12T06:30:00Z",
+    "cards": [
+      {
+        "id": "headline_accuracy",
+        "description": "The displayed score is 100 minus sMAPE; it is not the probability that the forecast direction or price is correct.",
+        "dataset": "run_summary",
+        "sourceId": "run_summary_sql",
+        "metrics": [
+          { "label": "Displayed accuracy", "field": "accuracy_score_pct", "format": "number", "unit": "%" },
+          { "label": "sMAPE", "field": "smape_pct", "format": "number", "unit": "%" }
+        ]
+      },
+      {
+        "id": "baseline_skill",
+        "description": "Negative skill means TimesFM's MAE is worse than repeating the last observed close for every holdout bar.",
+        "dataset": "run_summary",
+        "sourceId": "run_summary_sql",
+        "metrics": [
+          { "label": "Skill vs last price", "field": "skill_vs_naive_pct", "format": "number", "unit": "%", "signed": true },
+          { "label": "TimesFM MAE", "field": "timesfm_mae_bdt", "format": "number", "unit": "BDT" },
+          { "label": "Baseline MAE", "field": "naive_mae_bdt", "format": "number", "unit": "BDT" }
+        ]
+      },
+      {
+        "id": "direction_accuracy",
+        "description": "Share of holdout bars for which the predicted up, down, or unchanged sign matched the actual sign.",
+        "dataset": "run_summary",
+        "sourceId": "run_summary_sql",
+        "metrics": [
+          { "label": "Direction matched", "field": "direction_accuracy_pct", "format": "number", "unit": "%" }
+        ]
+      },
+      {
+        "id": "interval_coverage",
+        "description": "Only a small fraction of actual closes fell inside the model's nominal Q10-Q90 interval.",
+        "dataset": "run_summary",
+        "sourceId": "run_summary_sql",
+        "metrics": [
+          { "label": "80% band coverage", "field": "coverage_80_pct", "format": "number", "unit": "%" },
+          { "label": "Nominal target", "field": "coverage_nominal_pct", "format": "number", "unit": "%" }
+        ]
+      },
+      {
+        "id": "variance_ratio",
+        "description": "The forecast variance is almost zero relative to the actual holdout variance, which is why the orange path looks flat.",
+        "dataset": "run_summary",
+        "sourceId": "run_summary_sql",
+        "metrics": [
+          { "label": "Predicted / actual variance", "field": "variance_ratio", "format": "percent" },
+          { "label": "Predicted standard deviation", "field": "predicted_std_bdt", "format": "number", "unit": "BDT" },
+          { "label": "Actual standard deviation", "field": "actual_std_bdt", "format": "number", "unit": "BDT" }
+        ]
+      },
+      {
+        "id": "r_squared",
+        "description": "A negative value means the forecast explains less holdout variation than predicting the holdout mean in the R-squared calculation.",
+        "dataset": "run_summary",
+        "sourceId": "run_summary_sql",
+        "metrics": [
+          { "label": "Holdout R-squared", "field": "r_squared", "format": "number", "signed": true }
+        ]
+      }
+    ],
+    "charts": [
+      {
+        "id": "horizon_mae_chart",
+        "title": "MAE by evaluation horizon",
+        "subtitle": "Prefixes of one open-loop holdout forecast; BDT per bar, lower is better.",
+        "intent": "trend",
+        "question": "How does TimesFM MAE compare with the constant last-price baseline as the evaluated horizon grows?",
+        "rationale": "Ten ordered horizon prefixes reveal whether relative forecast error improves or deteriorates without treating the prefixes as independent backtest folds.",
+        "comparisonContext": {
+          "baseline": "Constant last-context close of BDT 286.60",
+          "grain": "Prefix horizon of one 598-bar forecast",
+          "unit": "BDT MAE per bar"
+        },
+        "type": "line",
+        "dataset": "horizon_mae",
+        "sourceId": "horizon_sql",
+        "encodings": {
+          "x": { "field": "horizon_bars", "type": "quantitative", "label": "Evaluated holdout bars" },
+          "y": { "field": "mae_bdt", "type": "quantitative", "label": "MAE", "unit": "BDT" },
+          "color": { "field": "series", "type": "nominal", "label": "Forecast" },
+          "lineStyle": { "field": "line_style", "type": "nominal", "label": "Line style" },
+          "tooltip": [
+            { "field": "skill_vs_naive_pct", "type": "quantitative", "label": "Skill vs baseline", "format": "number", "unit": "%" }
+          ]
+        },
+        "xAxisTitle": "Evaluated holdout bars",
+        "yAxisTitle": "MAE (BDT)",
+        "valueFormat": "number",
+        "unit": "BDT",
+        "layout": "full",
+        "labels": { "values": "endpoints" },
+        "legend": { "position": "bottom", "sort": "spec" },
+        "palette": { "kind": "semantic", "name": "forecast-vs-baseline" },
+        "settings": { "showPoints": "always" },
+        "surface": { "viewMode": "visualization", "interactiveLegend": true }
+      }
+    ],
+    "tables": [
+      {
+        "id": "metric_audit_table",
+        "title": "Full-holdout metric audit",
+        "subtitle": "GP daily close, January 23, 2024 through August 11, 2026; 598 scored bars.",
+        "dataset": "metric_audit",
+        "sourceId": "metric_audit_sql",
+        "defaultSort": { "field": "rank", "direction": "asc" },
+        "density": "spacious",
+        "layout": "full",
+        "columns": [
+          { "field": "rank", "label": "#", "format": "number" },
+          { "field": "metric", "label": "Metric", "type": "text" },
+          { "field": "observed", "label": "Observed", "type": "text" },
+          { "field": "benchmark", "label": "Benchmark or meaning", "type": "text" },
+          { "field": "diagnosis", "label": "Diagnosis", "type": "text" }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "run_record",
+        "label": "Saved GP prediction run gp-1d-20260812T053147Z-f9ed7068",
+        "path": "prediction-runs/gp-1d-20260812T053147Z-f9ed7068.json"
+      },
+      {
+        "id": "run_summary_sql",
+        "label": "GP run summary calculation",
+        "path": "diagnostics/gp_run_summary.sql"
+      },
+      {
+        "id": "horizon_sql",
+        "label": "GP horizon sensitivity calculation",
+        "path": "diagnostics/gp_horizon_mae.sql"
+      },
+      {
+        "id": "metric_audit_sql",
+        "label": "GP metric audit rows",
+        "path": "diagnostics/gp_metric_audit.sql"
+      },
+      {
+        "id": "implementation",
+        "label": "Local TimesFM forecasting implementation",
+        "path": "dohasecuritiesstockai/timesfm_forecasting/pipeline.py"
+      }
+    ],
+    "blocks": [
+      {
+        "id": "report_title",
+        "type": "markdown",
+        "body": "# Why GP's TimesFM backtest went flat"
+      },
+      {
+        "id": "technical_summary",
+        "type": "markdown",
+        "sourceId": "run_record",
+        "body": "## Technical summary\n\n**The flat orange line is genuine model output, and this GP configuration should not be treated as a useful trading forecast.** Across 598 hidden daily closes, TimesFM's MAE was BDT 32.27 versus BDT 31.81 for simply repeating the last known close, so skill was **-1.46%**. Direction matched only **46.82%** of bars, R-squared was **-0.028**, and the nominal 80% interval covered only **4.52%** of actual closes.\n\n**The GPU did not cause the poor shape.** This saved run used the CPU because the Tesla P100 was incompatible with the installed PyTorch kernels. GPU execution would primarily change speed; it would not add information, retrain the weights, or turn this long-horizon path into a more accurate one."
+      },
+      {
+        "id": "headline_metrics",
+        "type": "metric-strip",
+        "cardIds": [
+          "headline_accuracy",
+          "baseline_skill",
+          "direction_accuracy",
+          "interval_coverage",
+          "variance_ratio",
+          "r_squared"
+        ]
+      },
+      {
+        "id": "flatness_finding",
+        "type": "markdown",
+        "sourceId": "run_record",
+        "body": "## The forecast collapsed toward a level instead of tracking price movement\n\nThe hidden actual close ranged from **BDT 222.20 to BDT 379.20**, a BDT 157.00 span. The prediction stayed between **BDT 286.56 and BDT 293.51**, only a BDT 6.96 span. Its variance was **0.095% of actual variance**, and predicted-versus-actual correlation was **-0.30**. Zooming in reveals small model movements; zooming out correctly shows that those movements are tiny relative to the stock's realized range."
+      },
+      {
+        "id": "horizon_explanation",
+        "type": "markdown",
+        "sourceId": "run_record",
+        "body": "## Longer evaluation does not reveal durable skill\n\nThe comparison below scores prefixes of the same one-origin forecast. TimesFM stays extremely close to the last-price baseline and finishes worse at 598 bars. This is a sensitivity check, not independent rolling validation, but it confirms that the large displayed accuracy score is not evidence of baseline-beating performance."
+      },
+      {
+        "id": "horizon_chart_block",
+        "type": "chart",
+        "chartId": "horizon_mae_chart",
+        "layout": "full"
+      },
+      {
+        "id": "metric_definition_finding",
+        "type": "markdown",
+        "sourceId": "run_record",
+        "body": "## The 88.63% headline is a percentage-error transform, not forecast reliability\n\nThe application defines `accuracy` as **100 minus sMAPE**. Prices around BDT 250-300 can therefore produce a visually high score even when the model misses path direction and volatility. For model selection, use baseline skill, MAE or MASE, directional performance, and interval calibration together; do not promote this score as a probability of correctness."
+      },
+      {
+        "id": "metric_table_block",
+        "type": "table",
+        "tableId": "metric_audit_table",
+        "layout": "full"
+      },
+      {
+        "id": "scope_and_design",
+        "type": "markdown",
+        "body": "## The test design is much harsher than the command suggests\n\nThe command loaded **1,195 daily bars** and the default 50/50 split gave the model 597 context bars, then asked it for all **598 hidden bars in one open-loop path** from January 23, 2024 to August 11, 2026. The `--future-steps 300` option controls the separate forward forecast; it does **not** limit the backtest to 300 bars. The implementation calls the backtest with the entire holdout length and never feeds hidden actuals back into later predictions.\n\nThat design is leakage-safe, but it is not representative of a strategy that refreshes a 5-, 12-, 20-, or 30-day forecast whenever a new close arrives. A very long raw-price forecast tends to accumulate error and regress toward a central level, making an almost-flat path unsurprising."
+      },
+      {
+        "id": "model_and_gpu",
+        "type": "markdown",
+        "body": "## CPU explains runtime, not accuracy\n\nThe saved run used `google/timesfm-2.0-500m-pytorch` on CPU with normalization enabled and the median quantile as the point forecast. The Tesla P100 has CUDA capability `sm_60`, while the installed PyTorch build contains kernels starting at `sm_70`, so the application correctly fell back to CPU. A compatible GPU would make inference faster and is useful for training, but it would not fix this forecast's information, target, horizon, or evaluation design.\n\nThe project also uses archived TimesFM 2.0. Google's current [TimesFM repository](https://github.com/google-research/timesfm) documents TimesFM 2.5, including longer context, improved quantile support, exogenous-regressor support, and a LoRA fine-tuning path. Upgrade and benchmark it; do not assume the newer checkpoint automatically fixes GP. Google's [TimesFM model overview](https://research.google/blog/a-decoder-only-foundation-model-for-time-series-forecasting/) also explains that long forecasts are generated in output patches, so later predictions depend on earlier generated values and error can accumulate."
+      },
+      {
+        "id": "limitations",
+        "type": "markdown",
+        "body": "## What this diagnosis establishes—and what it does not\n\nThis result establishes that **this saved GP run and evaluation configuration failed useful baseline and calibration checks**. It does not establish that TimesFM is universally poor, nor that another horizon, target, checkpoint, or rolling test will fail. The evidence is one stock and one forecast origin; the current target is the raw close; no sector, index, volume, corporate-action, or macro regressors were supplied; and no transaction-cost trading strategy was evaluated."
+      },
+      {
+        "id": "recommended_actions",
+        "type": "markdown",
+        "body": "## Fix evaluation before fine-tuning\n\n1. **Add rolling-origin backtesting.** At each historical cutoff, forecast the horizon actually used in decisions—start with 5, 12, 20, and 30 trading days—then advance the cutoff and aggregate results. Keep a final untouched period. A new `--backtest-horizon` option would make this explicit; `--future-steps` currently does not.\n2. **Benchmark simple forecasts.** Compare TimesFM with last price, drift, and a suitable statistical baseline. Report MAE or MASE, skill versus baseline, direction, and Q10-Q90 coverage by horizon and market regime. Demote `100 - sMAPE` from the main accuracy label.\n3. **Test a stationary target.** Compare raw close with log returns or price deltas, reconstruct prices for scoring, and preserve chronological splits. Long raw price levels are non-stationary and encourage level forecasts.\n4. **Benchmark TimesFM 2.5 zero-shot before training.** It is the maintained line and supports longer context and exogenous regressors. Require repeated out-of-sample improvement rather than relying on one graph.\n5. **Use covariates without leakage.** Candidate inputs include DSEX or DS30, sector movement, volume and turnover, calendar features, corporate-action flags, rates, and FX. Any future covariate must be known in advance or separately forecast as a scenario.\n6. **Fine-tune only with pooled data.** One GP history of 1,195 observations is too small for a convincing 500M-model adaptation. Use sliding windows across many DSE equities and regimes, match training horizons to production, and use LoRA or QLoRA with strict ticker/time holdouts. Google's official [fine-tuning guide](https://github.com/google-research/timesfm/blob/master/timesfm-forecasting/examples/finetuning/README.md) documents this path for TimesFM 2.5."
+      },
+      {
+        "id": "promotion_gate",
+        "type": "markdown",
+        "body": "## Promote a model only after it beats the baseline repeatedly\n\nA replacement should show positive out-of-sample skill across multiple rolling folds and several DSE symbols, direction performance that is stable rather than a one-run fluctuation, and uncertainty coverage reasonably close to its nominal level. If the intended use is trading, the last gate is a transaction-cost- and slippage-aware strategy test. Better-looking forecast lines are not enough."
+      },
+      {
+        "id": "further_questions",
+        "type": "markdown",
+        "body": "## Further questions\n\n- What holding period will the forecast support: 1 day, 5 days, 12 days, or a longer allocation horizon?\n- Are historical prices adjusted for dividends, splits, rights issues, and other corporate actions?\n- Which DSE symbols and market regimes should form the pooled training and final evaluation universe?\n- Which exogenous variables are available at prediction time without future leakage?"
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-08-12T06:30:00Z",
+    "status": "ready",
+    "datasets": {
+      "run_summary": [
+        {
+          "accuracy_score_pct": 88.6306,
+          "smape_pct": 11.3694,
+          "skill_vs_naive_pct": -1.4551,
+          "timesfm_mae_bdt": 32.273934,
+          "naive_mae_bdt": 31.811037,
+          "direction_accuracy_pct": 46.8227,
+          "coverage_80_pct": 4.5151,
+          "coverage_nominal_pct": 80.0,
+          "variance_ratio": 0.0009519820964956403,
+          "predicted_std_bdt": 1.1219044008063683,
+          "actual_std_bdt": 36.36147241581861,
+          "r_squared": -0.02803
+        }
+      ],
+      "horizon_mae": [
+        { "horizon_bars": 30, "series": "TimesFM", "mae_bdt": 5.24998, "line_style": "solid", "skill_vs_naive_pct": -4.0286 },
+        { "horizon_bars": 30, "series": "Last-price baseline", "mae_bdt": 5.04667, "line_style": "dashed", "skill_vs_naive_pct": -4.0286 },
+        { "horizon_bars": 60, "series": "TimesFM", "mae_bdt": 26.4866, "line_style": "solid", "skill_vs_naive_pct": -1.1906 },
+        { "horizon_bars": 60, "series": "Last-price baseline", "mae_bdt": 26.175, "line_style": "dashed", "skill_vs_naive_pct": -1.1906 },
+        { "horizon_bars": 96, "series": "TimesFM", "mae_bdt": 38.0453, "line_style": "solid", "skill_vs_naive_pct": -1.0918 },
+        { "horizon_bars": 96, "series": "Last-price baseline", "mae_bdt": 37.6344, "line_style": "dashed", "skill_vs_naive_pct": -1.0918 },
+        { "horizon_bars": 128, "series": "TimesFM", "mae_bdt": 39.5413, "line_style": "solid", "skill_vs_naive_pct": -1.0399 },
+        { "horizon_bars": 128, "series": "Last-price baseline", "mae_bdt": 39.1344, "line_style": "dashed", "skill_vs_naive_pct": -1.0399 },
+        { "horizon_bars": 192, "series": "TimesFM", "mae_bdt": 41.3634, "line_style": "solid", "skill_vs_naive_pct": -0.0739 },
+        { "horizon_bars": 192, "series": "Last-price baseline", "mae_bdt": 41.3328, "line_style": "dashed", "skill_vs_naive_pct": -0.0739 },
+        { "horizon_bars": 256, "series": "TimesFM", "mae_bdt": 41.3333, "line_style": "solid", "skill_vs_naive_pct": 0.4739 },
+        { "horizon_bars": 256, "series": "Last-price baseline", "mae_bdt": 41.5301, "line_style": "dashed", "skill_vs_naive_pct": 0.4739 },
+        { "horizon_bars": 300, "series": "TimesFM", "mae_bdt": 39.9547, "line_style": "solid", "skill_vs_naive_pct": 0.7968 },
+        { "horizon_bars": 300, "series": "Last-price baseline", "mae_bdt": 40.2757, "line_style": "dashed", "skill_vs_naive_pct": 0.7968 },
+        { "horizon_bars": 384, "series": "TimesFM", "mae_bdt": 34.3531, "line_style": "solid", "skill_vs_naive_pct": 1.2341 },
+        { "horizon_bars": 384, "series": "Last-price baseline", "mae_bdt": 34.7823, "line_style": "dashed", "skill_vs_naive_pct": 1.2341 },
+        { "horizon_bars": 512, "series": "TimesFM", "mae_bdt": 30.8351, "line_style": "solid", "skill_vs_naive_pct": 0.1903 },
+        { "horizon_bars": 512, "series": "Last-price baseline", "mae_bdt": 30.8939, "line_style": "dashed", "skill_vs_naive_pct": 0.1903 },
+        { "horizon_bars": 598, "series": "TimesFM", "mae_bdt": 32.273934, "line_style": "solid", "skill_vs_naive_pct": -1.4551 },
+        { "horizon_bars": 598, "series": "Last-price baseline", "mae_bdt": 31.811037, "line_style": "dashed", "skill_vs_naive_pct": -1.4551 }
+      ],
+      "metric_audit": [
+        { "rank": 1, "metric": "Displayed accuracy", "observed": "88.63%", "benchmark": "Defined as 100 - sMAPE", "diagnosis": "Not a probability of a correct price or direction" },
+        { "rank": 2, "metric": "Mean absolute error", "observed": "BDT 32.27", "benchmark": "Last-price MAE: BDT 31.81", "diagnosis": "Worse than the naive forecast" },
+        { "rank": 3, "metric": "Skill vs last price", "observed": "-1.46%", "benchmark": "Positive is better", "diagnosis": "No baseline-beating skill" },
+        { "rank": 4, "metric": "Directional accuracy", "observed": "46.82%", "benchmark": "50% is a rough binary reference", "diagnosis": "No useful directional evidence in this run" },
+        { "rank": 5, "metric": "R-squared", "observed": "-0.028", "benchmark": "Zero is the holdout-mean reference", "diagnosis": "Explains no useful holdout variation" },
+        { "rank": 6, "metric": "Q10-Q90 coverage", "observed": "4.52%", "benchmark": "Nominal: 80%", "diagnosis": "Severely under-dispersed uncertainty" },
+        { "rank": 7, "metric": "Price range", "observed": "Predicted BDT 6.96", "benchmark": "Actual BDT 157.00", "diagnosis": "Forecast path is genuinely flat at the full scale" }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "run_record",
+      "label": "Saved GP prediction run gp-1d-20260812T053147Z-f9ed7068",
+      "path": "prediction-runs/gp-1d-20260812T053147Z-f9ed7068.json"
+    },
+    {
+      "id": "run_summary_sql",
+      "query": {
+        "engine": "duckdb",
+        "id": "gp-run-summary-20260812",
+        "language": "sql",
+        "description": "Loads the saved run's headline metrics and calculates actual-versus-predicted dispersion from its backtest rows.",
+        "executed_at": "2026-08-12T06:15:00Z",
+        "sql": "WITH run AS (SELECT * FROM read_json_auto('prediction-runs/gp-1d-20260812T053147Z-f9ed7068.json')), dispersion AS (SELECT var_samp(b.predicted::DOUBLE) / var_samp(b.actual::DOUBLE) AS variance_ratio, stddev_samp(b.predicted::DOUBLE) AS predicted_std_bdt, stddev_samp(b.actual::DOUBLE) AS actual_std_bdt FROM run, UNNEST(backtest) AS t(b)) SELECT r.metrics.accuracy_score AS accuracy_score_pct, r.metrics.smape_percent AS smape_pct, r.metrics.skill_vs_naive_percent AS skill_vs_naive_pct, r.metrics.mae AS timesfm_mae_bdt, r.metrics.naive_mae AS naive_mae_bdt, r.metrics.directional_accuracy_percent AS direction_accuracy_pct, r.metrics.interval_80_coverage_percent AS coverage_80_pct, 80.0 AS coverage_nominal_pct, d.variance_ratio, d.predicted_std_bdt, d.actual_std_bdt, r.metrics.r_squared FROM run r CROSS JOIN dispersion d"
+      }
+    },
+    {
+      "id": "horizon_sql",
+      "query": {
+        "engine": "duckdb",
+        "id": "gp-horizon-mae-20260812",
+        "language": "sql",
+        "description": "Calculates TimesFM and constant-last-price MAE over selected prefixes of the same ordered holdout forecast.",
+        "executed_at": "2026-08-12T06:15:00Z",
+        "sql": "WITH run AS (SELECT * FROM read_json_auto('prediction-runs/gp-1d-20260812T053147Z-f9ed7068.json')), ordered AS (SELECT row_number() OVER (ORDER BY b.time) AS horizon_bars, b.actual::DOUBLE AS actual, b.predicted::DOUBLE AS predicted FROM run, UNNEST(backtest) AS t(b)), prefixes AS (SELECT horizon_bars, avg(abs(predicted - actual)) OVER (ORDER BY horizon_bars ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS timesfm_mae_bdt, avg(abs(286.6 - actual)) OVER (ORDER BY horizon_bars ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS last_price_mae_bdt FROM ordered), selected AS (SELECT *, (1 - timesfm_mae_bdt / NULLIF(last_price_mae_bdt, 0)) * 100 AS skill_vs_naive_pct FROM prefixes WHERE horizon_bars IN (30,60,96,128,192,256,300,384,512,598)) SELECT horizon_bars, 'TimesFM' AS series, timesfm_mae_bdt AS mae_bdt, 'solid' AS line_style, skill_vs_naive_pct FROM selected UNION ALL SELECT horizon_bars, 'Last-price baseline' AS series, last_price_mae_bdt AS mae_bdt, 'dashed' AS line_style, skill_vs_naive_pct FROM selected ORDER BY horizon_bars, series DESC"
+      }
+    },
+    {
+      "id": "metric_audit_sql",
+      "query": {
+        "engine": "duckdb",
+        "id": "gp-metric-audit-20260812",
+        "language": "sql",
+        "description": "Shapes the reviewed full-holdout metrics and benchmark interpretations into an audit table.",
+        "executed_at": "2026-08-12T06:15:00Z",
+        "sql": "SELECT * FROM (VALUES (1, 'Displayed accuracy', '88.63%', 'Defined as 100 - sMAPE', 'Not a probability of a correct price or direction'), (2, 'Mean absolute error', 'BDT 32.27', 'Last-price MAE: BDT 31.81', 'Worse than the naive forecast'), (3, 'Skill vs last price', '-1.46%', 'Positive is better', 'No baseline-beating skill'), (4, 'Directional accuracy', '46.82%', '50% is a rough binary reference', 'No useful directional evidence in this run'), (5, 'R-squared', '-0.028', 'Zero is the holdout-mean reference', 'Explains no useful holdout variation'), (6, 'Q10-Q90 coverage', '4.52%', 'Nominal: 80%', 'Severely under-dispersed uncertainty'), (7, 'Price range', 'Predicted BDT 6.96', 'Actual BDT 157.00', 'Forecast path is genuinely flat at the full scale')) AS t(rank, metric, observed, benchmark, diagnosis) ORDER BY rank"
+      }
+    },
+    {
+      "id": "implementation",
+      "query": {
+        "engine": "source-code",
+        "language": "python",
+        "description": "Local forecasting pipeline, TimesFM backend, and metric definitions inspected for split, horizon, device, normalization, and scoring behavior."
+      }
+    }
+  ]
+}
