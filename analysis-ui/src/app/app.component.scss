@@ -186,6 +186,12 @@
   background: #f0f6f9;
 }
 
+.company-tags .ai-tag {
+  border-color: #9bcab8;
+  color: var(--green);
+  background: #eef8f3;
+}
+
 .company-tags .negative-change {
   color: var(--red);
 }
@@ -273,6 +279,22 @@
 
 .our-take li::marker {
   color: var(--blue);
+}
+
+.ai-rationale {
+  max-width: 62rem;
+  margin: 1.25rem 0 0;
+  padding: 1rem 1.15rem;
+  border-left: 0.24rem solid var(--blue);
+  color: var(--muted);
+  background: #f3f7f9;
+  line-height: 1.55;
+}
+
+.ai-provenance {
+  display: block;
+  margin-top: 0.65rem;
+  color: var(--muted);
 }
 
 .in-depth-card,
@@ -386,6 +408,16 @@
   color: var(--muted);
   font-size: 1.05rem;
   line-height: 1.55;
+}
+
+.valuation-formula {
+  max-width: 72rem;
+  padding: 0.8rem 1rem;
+  border-radius: 0.8rem;
+  color: #456759;
+  background: #eef7f2;
+  font-size: 0.92rem;
+  line-height: 1.5;
 }
 
 .valuation-methods {
@@ -550,6 +582,76 @@
   margin-top: 2.5rem;
 }
 
+.ai-trader-report {
+  margin-top: 2.5rem;
+  padding: clamp(1.3rem, 2.5vw, 2rem);
+  border: 1px solid #b9d3c7;
+  border-radius: 1.25rem;
+  background: #f2f8f5;
+}
+
+.ai-trader-report > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ai-trader-report h2,
+.ai-trader-report h3 {
+  margin-top: 0;
+}
+
+.trader-rating {
+  padding: 0.45rem 1rem;
+  border-radius: 2rem;
+  color: #fff;
+  background: var(--green);
+  font-weight: 750;
+}
+
+.trader-rating.hold {
+  background: var(--copper);
+}
+
+.trader-rating.underweight,
+.trader-rating.sell {
+  background: var(--red);
+}
+
+.trader-summary {
+  max-width: 72rem;
+  color: var(--ink);
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.trader-grid,
+.trader-lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.trader-grid article,
+.trader-lists > div {
+  padding: 1.1rem;
+  border-radius: 0.9rem;
+  background: rgb(255 255 255 / 75%);
+}
+
+.trader-grid p,
+.trader-lists li,
+.data-quality {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.data-quality {
+  margin: 1rem 0 0;
+}
+
 .agent-evidence > p {
   color: var(--muted);
 }
@@ -678,7 +780,9 @@
   }
 
   .score-overview,
-  .report-section-grid {
+  .report-section-grid,
+  .trader-grid,
+  .trader-lists {
     grid-template-columns: 1fr;
   }
 

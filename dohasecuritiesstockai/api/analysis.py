@@ -49,6 +49,16 @@ def _number(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
+def _market_price(row: dict[str, Any]) -> float | None:
+    """Return the best positive quote, including the market-closed fallback."""
+
+    for key in ("ltp", "close", "ycp"):
+        value = _number(row.get(key))
+        if value is not None and value > 0:
+            return value
+    return None
+
+
 def _clamp(value: float, low: float = 0, high: float = 10) -> float:
     return round(max(low, min(high, value)), 1)
 
@@ -81,6 +91,61 @@ def _annual_rows(rows: Any, cutoff_year: int) -> list[dict[str, Any]]:
         and str(row.get("quarter", "Annual")).lower() == "annual"
     ]
     return sorted(annual, key=_year)
+
+
+def _rows_through(rows: Any, cutoff: date) -> list[dict[str, Any]]:
+    """Return disclosure rows that were available on or before ``cutoff``."""
+
+    if not isinstance(rows, list):
+        return []
+    accepted: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        raw_date = row.get("date") or row.get("record_date") or row.get("published_at")
+        if raw_date:
+            try:
+                parsed = datetime.fromisoformat(str(raw_date).replace("Z", "+00:00")).date()
+            except ValueError:
+                parsed = None
+            if parsed is not None and parsed > cutoff:
+                continue
+        row_year = _year(row)
+        if row_year and row_year > cutoff.year:
+            continue
+        accepted.append(row)
+    return accepted
+
+
+def _balance_history_through(balance: Any, cutoff_year: int) -> list[dict[str, Any]]:
+    """Turn the gateway's columnar balance sheet into year-keyed evidence."""
+
+    if not isinstance(balance, dict):
+        return []
+    columns = balance.get("columns")
+    histories = balance.get("year_wise_data")
+    if not isinstance(columns, list) or not isinstance(histories, list):
+        return []
+    results: list[dict[str, Any]] = []
+    for item in histories:
+        if not isinstance(item, dict):
+            continue
+        for raw_year, values in item.items():
+            try:
+                year = int(str(raw_year)[:4])
+            except (TypeError, ValueError):
+                continue
+            if 0 < year <= cutoff_year and isinstance(values, list):
+                results.append(
+                    {
+                        "year": year,
+                        "values": {
+                            str(column): value
+                            for column, value in zip(columns, values, strict=False)
+                        },
+                    }
+                )
+    return sorted(results, key=lambda item: item["year"])[-8:]
 
 
 def _metric(
@@ -130,7 +195,7 @@ def list_dse_stocks(client: DSEClient | None = None) -> list[StockOption]:
                 symbol=symbol,
                 name=str(row.get("securityName") or symbol).strip(),
                 sector=str(row.get("sector") or "").strip(),
-                latest_price=_number(row.get("ltp")),
+                latest_price=_market_price(row),
                 change_percent=_number(row.get("changePercentage")),
             )
         )
@@ -153,6 +218,7 @@ class StockAnalysisBuilder:
 
     def __init__(self, client: DSEClient | None = None) -> None:
         self.client = client or DSEClient()
+        self.last_evidence: dict[str, Any] = {}
 
     def _fundamental(self, path: str, symbol: str) -> Any:
         return _unwrap(
@@ -244,7 +310,7 @@ class StockAnalysisBuilder:
                 continue
             if peer == symbol:
                 continue
-            price = _number(row.get("ltp"))
+            price = _market_price(row)
             if not price or price <= 0:
                 continue
             try:
@@ -276,7 +342,8 @@ class StockAnalysisBuilder:
             self.client.get("analytics", f"/api/balance_sheet/balance-sheet/{symbol}")
         )
         company = data["company"] if isinstance(data["company"], dict) else {}
-        price = _number(quote.get("ltp")) or _number(quote.get("close"))
+        history = self._historical_snapshot(symbol, analysis_date)
+        price = history.get("latest_price") or _market_price(quote)
         if not price or price <= 0:
             raise LookupError(f"No usable DSE price was returned for {symbol}")
 
@@ -325,6 +392,7 @@ class StockAnalysisBuilder:
             str(quote.get("sector") or company.get("sector") or ""),
             universe,
             cutoff_year,
+            allow_live_peers=analysis_date >= date.today(),
         )
         dividend_factor = self._dividend_factor(dividends, price)
         factors = [
@@ -344,8 +412,12 @@ class StockAnalysisBuilder:
         )
         score = int(max(0, min(100, score)))
 
-        momentum = self._momentum(symbol, analysis_date)
+        momentum = {
+            "return_30d": history.get("return_30d"),
+            "quiet": bool(history.get("quiet")),
+        }
         score_label, headline = self._headline(score, momentum)
+        state = agent_state or {}
         report_sections = self._sections(
             score,
             profit_factor,
@@ -369,12 +441,17 @@ class StockAnalysisBuilder:
             f"{company_name} combines {health_factor.title.en.lower()} with {profit_factor.title.en.lower()} — valuation and execution still matter.",
             f"{company_name}-এর {health_factor.title.bn} এবং {profit_factor.title.bn}—তবে মূল্যায়ন ও বাস্তবায়ন গুরুত্বপূর্ণ।",
         )
-        in_depth_snippet = text(
-            "This report brings together DSE price history, company disclosures, dividends, ownership and the complete multi-agent debate. Open the full analysis to see the evidence, risks and final trading view.",
-            "এই প্রতিবেদনে ডিএসই মূল্য ইতিহাস, কোম্পানি প্রকাশনা, লভ্যাংশ, মালিকানা এবং সম্পূর্ণ মাল্টি-এজেন্ট বিতর্ক একত্র করা হয়েছে। প্রমাণ, ঝুঁকি ও চূড়ান্ত ট্রেডিং মত দেখতে পূর্ণ বিশ্লেষণ খুলুন।",
+        in_depth_snippet = (
+            text(
+                "This report brings together DSE price history, company disclosures, dividends, ownership and the complete multi-agent debate. Open the full analysis to see the evidence, risks and final trading view.",
+                "এই প্রতিবেদনে ডিএসই মূল্য ইতিহাস, কোম্পানি প্রকাশনা, লভ্যাংশ, মালিকানা এবং সম্পূর্ণ মাল্টি-এজেন্ট বিতর্ক একত্র করা হয়েছে। প্রমাণ, ঝুঁকি ও চূড়ান্ত ট্রেডিং মত দেখতে পূর্ণ বিশ্লেষণ খুলুন।",
+            )
+            if state
+            else text(
+                "This lightweight report uses only read-only DSE price history, company disclosures, dividends and ownership data. No multi-agent or LLM analysis was run.",
+                "এই হালকা প্রতিবেদনে শুধু পঠনযোগ্য ডিএসই মূল্য ইতিহাস, কোম্পানি প্রকাশনা, লভ্যাংশ ও মালিকানার তথ্য ব্যবহার করা হয়েছে। কোনো মাল্টি-এজেন্ট বা এলএলএম বিশ্লেষণ চালানো হয়নি।",
+            )
         )
-
-        state = agent_state or {}
         agent_reports = AgentReports(
             market_report=str(state.get("market_report") or ""),
             news_report=str(state.get("news_report") or ""),
@@ -387,8 +464,21 @@ class StockAnalysisBuilder:
             final_trade_decision=str(state.get("final_trade_decision") or ""),
             raw_state=state,
         )
-        low_52, high_52 = self._parse_range(company.get("fifty_two_weeks_moving_range"))
-        return StockAnalysis(
+        low_52 = history.get("fifty_two_week_low")
+        high_52 = history.get("fifty_two_week_high")
+        if low_52 is None or high_52 is None:
+            low_52, high_52 = self._parse_range(
+                company.get("fifty_two_weeks_moving_range")
+            )
+        previous_close = history.get("previous_close") or _number(quote.get("ycp"))
+        price_change = history.get("change")
+        change_percent = history.get("change_percent")
+        if price_change is None:
+            price_change = _number(quote.get("change"))
+        if change_percent is None:
+            change_percent = _number(quote.get("changePercentage"))
+        market_as_of = history.get("as_of") or datetime.now(timezone.utc)
+        analysis = StockAnalysis(
             analysis_id=f"{symbol}-{analysis_date}",
             symbol=symbol,
             company_name=company_name,
@@ -397,12 +487,12 @@ class StockAnalysisBuilder:
             generated_at=datetime.now(timezone.utc),
             market=MarketSnapshot(
                 latest_price=price,
-                change=_number(quote.get("change")),
-                change_percent=_number(quote.get("changePercentage")),
-                previous_close=_number(quote.get("ycp")),
+                change=price_change,
+                change_percent=change_percent,
+                previous_close=previous_close,
                 fifty_two_week_low=low_52,
                 fifty_two_week_high=high_52,
-                as_of=datetime.now(timezone.utc),
+                as_of=market_as_of,
             ),
             fundamental_score=score,
             score_label=score_label,
@@ -418,12 +508,18 @@ class StockAnalysisBuilder:
                 EvidenceSource(
                     name="Doha Securities DSE gateway",
                     source_type="dse_api",
-                    detail="Live quote, candles, company fundamentals, balance sheet, ownership and dividends (read-only).",
+                    detail="Date-bounded candles, company fundamentals, balance sheet, ownership and dividends (read-only).",
                 ),
-                EvidenceSource(
-                    name="TradingAgents full state",
-                    source_type="agent_state",
-                    detail="Market, news and fundamentals reports, researcher debate, risk debate and final decision.",
+                *(
+                    [
+                        EvidenceSource(
+                            name="TradingAgents full state",
+                            source_type="agent_state",
+                            detail="Market, news and fundamentals reports, researcher debate, risk debate and final decision.",
+                        )
+                    ]
+                    if state
+                    else []
                 ),
                 EvidenceSource(
                     name="Transparent presentation calculations",
@@ -436,6 +532,34 @@ class StockAnalysisBuilder:
                 "শুধু শিক্ষামূলক বিশ্লেষণ। ন্যায্য মূল্য উপলভ্য তথ্যের আনুমানিক হিসাব; এটি মূল্য লক্ষ্য বা বিনিয়োগ পরামর্শ নয়।",
             ),
         )
+        self.last_evidence = {
+            "symbol": symbol,
+            "company": {
+                key: value
+                for key, value in company.items()
+                if key not in {"fifty_two_weeks_moving_range", "last_agm_date"}
+            },
+            "analysis_date": analysis_date.isoformat(),
+            "market_snapshot": analysis.market.model_dump(mode="json"),
+            "annual_financial_performance": financial[-10:],
+            "quarterly_performance": _rows_through(data["quarterly"], analysis_date)[-16:],
+            "balance_sheet_history": _balance_history_through(balance, cutoff_year),
+            "shareholding_history": _rows_through(data["shareholding"], analysis_date)[-12:],
+            "dividend_history": _rows_through(data["dividends"], analysis_date)[-10:],
+            "nav_history": _rows_through(data["nav"], analysis_date)[-10:],
+            "loan_status": data["loan"],
+            "operating_cash_flow_per_share_history": _rows_through(
+                data["nocfps"], analysis_date
+            )[-16:],
+            "price_momentum": momentum,
+            "technical_evidence": history.get("technical_evidence", {}),
+            "calculated_factors": [factor.model_dump(mode="json") for factor in factors],
+            "valuation_anchors": {
+                "current_price": valuation.current_price,
+                "methods": [method.model_dump(mode="json") for method in valuation.methods],
+            },
+        }
+        return analysis
 
     @staticmethod
     def _profit_factor(eps_values: list[float]) -> FactorCard:
@@ -584,6 +708,8 @@ class StockAnalysisBuilder:
         sector: str,
         universe: list[dict[str, Any]],
         cutoff_year: int,
+        *,
+        allow_live_peers: bool = True,
     ) -> tuple[ValuationSummary, FactorCard]:
         del face_value
         historical_pe = _median(
@@ -591,7 +717,11 @@ class StockAnalysisBuilder:
         )
         current_pe = price / latest_eps if latest_eps and latest_eps > 0 else None
         own_profit = latest_eps * historical_pe if latest_eps and historical_pe else None
-        peer_pe = self._peer_pe(symbol, sector, universe, cutoff_year) if sector else None
+        peer_pe = (
+            self._peer_pe(symbol, sector, universe, cutoff_year)
+            if sector and allow_live_peers
+            else None
+        )
         peer_profit = latest_eps * peer_pe if latest_eps and peer_pe else None
 
         historical_pb_values: list[float] = []
@@ -729,21 +859,76 @@ class StockAnalysisBuilder:
         )
 
     @staticmethod
-    def _momentum(symbol: str, analysis_date: date) -> dict[str, float | bool | None]:
+    def _historical_snapshot(
+        symbol: str, analysis_date: date
+    ) -> dict[str, Any]:
         try:
             frame = fetch_dse_ohlcv(
                 symbol,
-                (analysis_date - timedelta(days=180)).isoformat(),
+                (analysis_date - timedelta(days=370)).isoformat(),
                 analysis_date.isoformat(),
             )
-            closes = [float(value) for value in frame["Close"].tail(60)]
-            if len(closes) < 2:
-                return {"return_30d": None, "quiet": False}
-            start = closes[-22] if len(closes) >= 22 else closes[0]
-            change = (closes[-1] / start - 1) * 100 if start else 0
-            return {"return_30d": round(change, 1), "quiet": abs(change) < 5}
+            closes = [float(value) for value in frame["Close"]]
+            if not closes:
+                return {}
+            latest = closes[-1]
+            previous = closes[-2] if len(closes) >= 2 else None
+            daily_change = latest - previous if previous else None
+            daily_percent = daily_change / previous * 100 if previous else None
+            momentum_start = closes[-22] if len(closes) >= 22 else closes[0]
+            momentum = (latest / momentum_start - 1) * 100 if momentum_start else None
+            raw_as_of = frame.iloc[-1].get("Date")
+            parsed_as_of = datetime.fromisoformat(str(raw_as_of)).replace(
+                tzinfo=timezone.utc
+            )
+            recent_bars = []
+            for _, row in frame.tail(60).iterrows():
+                recent_bars.append(
+                    {
+                        "date": str(row.get("Date"))[:10],
+                        "open": _number(row.get("Open")),
+                        "high": _number(row.get("High")),
+                        "low": _number(row.get("Low")),
+                        "close": _number(row.get("Close")),
+                        "volume": _number(row.get("Volume")),
+                    }
+                )
+            volumes = [
+                value
+                for value in (_number(raw) for raw in frame["Volume"].tail(20))
+                if value is not None
+            ]
+
+            def moving_average(period: int) -> float | None:
+                if len(closes) < period:
+                    return None
+                return round(sum(closes[-period:]) / period, 2)
+
+            return {
+                "latest_price": latest,
+                "previous_close": previous,
+                "change": round(daily_change, 2) if daily_change is not None else None,
+                "change_percent": (
+                    round(daily_percent, 2) if daily_percent is not None else None
+                ),
+                "fifty_two_week_low": min(closes),
+                "fifty_two_week_high": max(closes),
+                "as_of": parsed_as_of,
+                "return_30d": round(momentum, 1) if momentum is not None else None,
+                "quiet": abs(momentum) < 5 if momentum is not None else False,
+                "technical_evidence": {
+                    "sma_20": moving_average(20),
+                    "sma_50": moving_average(50),
+                    "sma_200": moving_average(200),
+                    "latest_volume": volumes[-1] if volumes else None,
+                    "average_volume_20": (
+                        round(sum(volumes) / len(volumes), 1) if volumes else None
+                    ),
+                    "recent_bars": recent_bars,
+                },
+            }
         except Exception:
-            return {"return_30d": None, "quiet": False}
+            return {}
 
     @staticmethod
     def _headline(score: int, momentum: dict[str, float | bool | None]) -> tuple[BilingualText, BilingualText]:

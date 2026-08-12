@@ -67,6 +67,9 @@
         <h1>{{ report.company_name }}</h1>
         <div class="company-tags">
           <span class="symbol-tag">{{ report.symbol }}</span>
+          @if (report.ai_research) {
+            <span class="ai-tag">AI-grounded</span>
+          }
           <span>{{ report.sector }}</span>
           <span>{{ language() === 'bn' ? 'সর্বশেষ দাম' : 'Latest price' }}: {{ formatTaka(report.market.latest_price) }}</span>
           @if (report.market.change_percent !== null) {
@@ -84,7 +87,7 @@
 
     <section class="score-overview">
       <article class="score-card">
-        <p class="section-label">{{ language() === 'bn' ? 'মৌলিক স্কোর' : 'Fundamental score' }}</p>
+        <p class="section-label">{{ report.ai_research ? (language() === 'bn' ? 'এআই মৌলিক স্কোর' : 'AI fundamental score') : (language() === 'bn' ? 'মৌলিক স্কোর' : 'Fundamental score') }}</p>
         <div class="score-chart">
           <canvas #scoreCanvas aria-label="Fundamental score chart"></canvas>
           <div class="score-center">
@@ -103,6 +106,13 @@
             <li>{{ copy(takeaway) }}</li>
           }
         </ul>
+        @if (report.ai_research; as ai) {
+          <p class="ai-rationale">{{ copy(ai.score_rationale) }}</p>
+          <small class="ai-provenance">
+            {{ language() === 'bn' ? 'এআই মডেল' : 'AI model' }}: {{ ai.provider }} / {{ ai.model }} ·
+            {{ language() === 'bn' ? 'আস্থা' : 'confidence' }}: {{ ai.score_confidence }}
+          </small>
+        }
       </article>
     </section>
 
@@ -146,6 +156,13 @@
       }
 
       <p class="valuation-summary">{{ copy(report.valuation.summary) }}</p>
+      @if (report.ai_research) {
+        <p class="valuation-formula">
+          {{ language() === 'bn'
+            ? 'এআই প্রতিটি হিসাব-পদ্ধতির নির্ভরযোগ্যতার ওজন নির্ধারণ করেছে; নিচের সংখ্যাগুলো যাচাইযোগ্য সূত্রে গণনা করা। ন্যায্য সীমা আনুমানিক মূল্যের ৮০%–১২০%।'
+            : 'AI assigned reliability weights to each method; the figures below remain calculation-backed. The fair range is 80%–120% of the rough estimate.' }}
+        </p>
+      }
       <dl class="valuation-methods">
         @for (method of report.valuation.methods; track method.key) {
           <div [class.unavailable]="!method.available">
@@ -203,6 +220,59 @@
           }
         </div>
 
+        @if (report.ai_research; as ai) {
+          <section class="ai-trader-report">
+            <header>
+              <div>
+                <p class="section-label">{{ language() === 'bn' ? 'এআই ট্রেডার ভিউ' : 'AI trader view' }}</p>
+                <h2>{{ copy(ai.trader_report.action) }}</h2>
+              </div>
+              <span [class]="'trader-rating ' + ai.trader_report.rating.toLowerCase()">
+                {{ ai.trader_report.rating }}
+              </span>
+            </header>
+            <p class="trader-summary">{{ copy(ai.trader_report.executive_summary) }}</p>
+            <div class="trader-grid">
+              <article>
+                <h3>{{ language() === 'bn' ? 'বিনিয়োগ যুক্তি' : 'Investment thesis' }}</h3>
+                <p>{{ copy(ai.trader_report.investment_thesis) }}</p>
+              </article>
+              <article>
+                <h3>{{ language() === 'bn' ? 'এন্ট্রি কৌশল' : 'Entry strategy' }}</h3>
+                <p>{{ copy(ai.trader_report.entry_strategy) }}</p>
+              </article>
+              <article>
+                <h3>{{ language() === 'bn' ? 'ঝুঁকি নিয়ন্ত্রণ' : 'Risk controls' }}</h3>
+                <p>{{ copy(ai.trader_report.risk_controls) }}</p>
+              </article>
+              <article>
+                <h3>{{ language() === 'bn' ? 'সময়সীমা' : 'Time horizon' }}</h3>
+                <p>{{ copy(ai.trader_report.time_horizon) }}</p>
+              </article>
+            </div>
+            <div class="trader-lists">
+              <div>
+                <h3>{{ language() === 'bn' ? 'সম্ভাব্য অনুঘটক' : 'Catalysts' }}</h3>
+                <ul>
+                  @for (item of ai.trader_report.catalysts; track item.en) {
+                    <li>{{ copy(item) }}</li>
+                  }
+                </ul>
+              </div>
+              <div>
+                <h3>{{ language() === 'bn' ? 'যে অবস্থায় মত বদলাবে' : 'Invalidation conditions' }}</h3>
+                <ul>
+                  @for (item of ai.trader_report.invalidation_conditions; track item.en) {
+                    <li>{{ copy(item) }}</li>
+                  }
+                </ul>
+              </div>
+            </div>
+            <p class="data-quality"><strong>{{ language() === 'bn' ? 'তথ্যের মান:' : 'Data quality:' }}</strong> {{ copy(ai.data_quality) }}</p>
+          </section>
+        }
+
+        @if (hasAgentEvidence(report)) {
         <section class="agent-evidence">
           <h2>{{ language() === 'bn' ? 'মূল এজেন্ট প্রমাণ' : 'Original agent evidence' }}</h2>
           <p>{{ language() === 'bn' ? 'নিচের অংশগুলো মূল মাল্টি-এজেন্ট রান থেকে অপরিবর্তিত রাখা হয়েছে।' : 'These sections are retained unchanged from the multi-agent run.' }}</p>
@@ -220,6 +290,7 @@
           }
           <details><summary>{{ language() === 'bn' ? 'পূর্ণ স্টেট লগ JSON' : 'Full state log JSON' }}</summary><pre class="json-state">{{ rawState(report) }}</pre></details>
         </section>
+        }
       </section>
     }
 

@@ -27,6 +27,10 @@ def test_product_command_and_legacy_alias_share_the_cli_entrypoint():
         'dohasecuritiesstockai-api = "dohasecuritiesstockai.api.__main__:main"'
         in project
     )
+    assert (
+        'dohasecuritiesstockai-dashboard = "dohasecuritiesstockai.dashboard_cli:main"'
+        in project
+    )
 
 
 def test_python_package_uses_dohasecuritiesstockai_directory():

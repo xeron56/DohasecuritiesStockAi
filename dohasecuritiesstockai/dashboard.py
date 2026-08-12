@@ -20,6 +20,7 @@ import uvicorn
 from dohasecuritiesstockai.api.analysis import StockAnalysisBuilder
 from dohasecuritiesstockai.api.models import StockAnalysis
 from dohasecuritiesstockai.api.repository import AnalysisRepository
+from dohasecuritiesstockai.default_config import DEFAULT_CONFIG
 
 
 class DashboardLaunchError(RuntimeError):
@@ -29,17 +30,34 @@ class DashboardLaunchError(RuntimeError):
 def prepare_dashboard_analysis(
     symbol: str,
     analysis_date: date | str,
-    agent_state: dict[str, Any],
+    agent_state: dict[str, Any] | None,
     results_dir: str | Path,
+    *,
+    use_ai: bool = True,
+    config: dict[str, Any] | None = None,
 ) -> tuple[StockAnalysis, Path]:
-    """Build and save the presentation model from the exact completed CLI state."""
+    """Build and save the UI payload, optionally enriching it with agent state.
+
+    Passing ``agent_state=None`` deliberately skips the multi-agent graph. When
+    ``use_ai`` is true, one configured model call synthesizes the already-fetched
+    evidence into the score, valuation weighting, report, and trader view.
+    """
 
     parsed_date = (
         analysis_date
         if isinstance(analysis_date, date)
         else date.fromisoformat(str(analysis_date))
     )
-    analysis = StockAnalysisBuilder().build(symbol, parsed_date, agent_state=agent_state)
+    builder = StockAnalysisBuilder()
+    analysis = builder.build(symbol, parsed_date, agent_state=agent_state)
+    if use_ai:
+        from dohasecuritiesstockai.api.ai_analysis import AIStockAnalysisGenerator
+
+        analysis = AIStockAnalysisGenerator(config or DEFAULT_CONFIG).enhance(
+            analysis,
+            builder.last_evidence,
+            agent_state,
+        )
     path = AnalysisRepository(results_dir).save_analysis(analysis)
     return analysis, path
 

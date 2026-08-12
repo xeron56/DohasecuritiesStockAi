@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
 import cli.main as cli_main
+import dohasecuritiesstockai.dashboard_cli as dashboard_cli
 from dohasecuritiesstockai.api.app import create_app
-from dohasecuritiesstockai.dashboard import dashboard_url
+from dohasecuritiesstockai.dashboard import dashboard_url, prepare_dashboard_analysis
 from dohasecuritiesstockai.graph.trading_graph import TradingAgentsGraph
 
 
@@ -15,6 +18,85 @@ def test_dashboard_url_targets_exact_cli_result() -> None:
     assert dashboard_url("0.0.0.0", 8000, "BRACBANK", "2026-08-09") == (
         "http://127.0.0.1:8000/?symbol=BRACBANK&date=2026-08-09"
     )
+
+
+def test_lightweight_dashboard_command_skips_agent_state(tmp_path: Path, monkeypatch) -> None:
+    calls: dict[str, object] = {}
+    analysis = SimpleNamespace(
+        symbol="GP",
+        analysis_date=date(2026, 8, 10),
+        fundamental_score=72,
+        score_label=SimpleNamespace(en="Good"),
+        ai_research=None,
+    )
+
+    def fake_prepare(
+        symbol, analysis_date, agent_state, results_dir, *, use_ai, config
+    ):
+        calls["prepare"] = (
+            symbol,
+            analysis_date,
+            agent_state,
+            results_dir,
+            use_ai,
+            config,
+        )
+        return analysis, tmp_path / "GP.json"
+
+    def fake_launch(symbol, analysis_date, *, host, port):
+        calls["launch"] = (symbol, analysis_date, host, port)
+
+    monkeypatch.setattr(dashboard_cli, "prepare_dashboard_analysis", fake_prepare)
+    monkeypatch.setattr(dashboard_cli, "launch_dashboard", fake_launch)
+    monkeypatch.setitem(dashboard_cli.DEFAULT_CONFIG, "results_dir", str(tmp_path))
+
+    dashboard_cli.show_dashboard(
+        "gp",
+        analysis_date="2026-08-10",
+        use_ai=True,
+        open_ui=True,
+        host="0.0.0.0",
+        port=8123,
+    )
+
+    assert calls["prepare"] == (
+        "gp",
+        date(2026, 8, 10),
+        None,
+        str(tmp_path),
+        True,
+        dashboard_cli.DEFAULT_CONFIG,
+    )
+    assert calls["launch"] == ("GP", date(2026, 8, 10), "0.0.0.0", 8123)
+
+
+def test_prepare_dashboard_analysis_accepts_lightweight_mode(tmp_path: Path, monkeypatch) -> None:
+    built = SimpleNamespace(symbol="GP", analysis_date=date(2026, 8, 10))
+    calls: dict[str, object] = {}
+
+    class FakeBuilder:
+        def build(self, symbol, analysis_date, agent_state):
+            calls["build"] = (symbol, analysis_date, agent_state)
+            return built
+
+    class FakeRepository:
+        def __init__(self, results_dir):
+            calls["results_dir"] = results_dir
+
+        def save_analysis(self, analysis):
+            calls["saved"] = analysis
+            return tmp_path / "analysis.json"
+
+    monkeypatch.setattr("dohasecuritiesstockai.dashboard.StockAnalysisBuilder", FakeBuilder)
+    monkeypatch.setattr("dohasecuritiesstockai.dashboard.AnalysisRepository", FakeRepository)
+
+    result, path = prepare_dashboard_analysis(
+        "GP", "2026-08-10", None, tmp_path, use_ai=False
+    )
+
+    assert result is built
+    assert path == tmp_path / "analysis.json"
+    assert calls["build"] == ("GP", date(2026, 8, 10), None)
 
 
 def test_open_ui_env_flag_is_strict(monkeypatch) -> None:

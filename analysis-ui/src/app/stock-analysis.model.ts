@@ -76,6 +76,31 @@ export interface AgentReports {
   raw_state: Record<string, unknown>;
 }
 
+export interface AITraderReport {
+  rating: 'Buy' | 'Overweight' | 'Hold' | 'Underweight' | 'Sell';
+  action: BilingualText;
+  confidence: 'low' | 'medium' | 'high';
+  executive_summary: BilingualText;
+  investment_thesis: BilingualText;
+  entry_strategy: BilingualText;
+  risk_controls: BilingualText;
+  catalysts: BilingualText[];
+  invalidation_conditions: BilingualText[];
+  time_horizon: BilingualText;
+}
+
+export interface AIResearch {
+  provider: string;
+  model: string;
+  mode: 'ai_fundamental' | 'multi_agent_synthesis';
+  generated_at: string;
+  score_confidence: 'low' | 'medium' | 'high';
+  score_rationale: BilingualText;
+  data_quality: BilingualText;
+  valuation_method_weights: Record<string, number>;
+  trader_report: AITraderReport;
+}
+
 export interface StockAnalysis {
   schema_version: '1.0';
   analysis_id: string;
@@ -95,6 +120,7 @@ export interface StockAnalysis {
   factors: FactorCard[];
   report_sections: ReportSection[];
   agent_reports: AgentReports;
+  ai_research?: AIResearch | null;
   disclaimer: BilingualText;
 }
 

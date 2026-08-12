@@ -86,9 +86,34 @@ class AgentReports(APIModel):
     raw_state: dict[str, Any] = Field(default_factory=dict)
 
 
+class AITraderReport(APIModel):
+    rating: Literal["Buy", "Overweight", "Hold", "Underweight", "Sell"]
+    action: BilingualText
+    confidence: Literal["low", "medium", "high"]
+    executive_summary: BilingualText
+    investment_thesis: BilingualText
+    entry_strategy: BilingualText
+    risk_controls: BilingualText
+    catalysts: list[BilingualText] = Field(default_factory=list)
+    invalidation_conditions: list[BilingualText] = Field(default_factory=list)
+    time_horizon: BilingualText
+
+
+class AIResearch(APIModel):
+    provider: str
+    model: str
+    mode: Literal["ai_fundamental", "multi_agent_synthesis"]
+    generated_at: datetime
+    score_confidence: Literal["low", "medium", "high"]
+    score_rationale: BilingualText
+    data_quality: BilingualText
+    valuation_method_weights: dict[str, float] = Field(default_factory=dict)
+    trader_report: AITraderReport
+
+
 class EvidenceSource(APIModel):
     name: str
-    source_type: Literal["dse_api", "agent_state", "calculation"]
+    source_type: Literal["dse_api", "agent_state", "calculation", "ai_analysis"]
     detail: str
 
 
@@ -111,6 +136,7 @@ class StockAnalysis(APIModel):
     factors: list[FactorCard]
     report_sections: list[ReportSection]
     agent_reports: AgentReports
+    ai_research: AIResearch | None = None
     sources: list[EvidenceSource]
     disclaimer: BilingualText
 

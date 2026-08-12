@@ -11,6 +11,7 @@ from datetime import date, datetime, timezone
 from dohasecuritiesstockai.default_config import DEFAULT_CONFIG
 from dohasecuritiesstockai.graph.trading_graph import TradingAgentsGraph
 
+from .ai_analysis import AIStockAnalysisGenerator
 from .analysis import StockAnalysisBuilder
 from .models import AnalysisJob, StockAnalysis
 from .repository import AnalysisRepository
@@ -62,7 +63,7 @@ class AnalysisService:
             job = self._update(job, status="running", message="Collecting DSE evidence.")
             if not force:
                 existing = self.repository.get_analysis(job.symbol, job.analysis_date)
-                if existing:
+                if existing and existing.ai_research is not None:
                     self._update(
                         job,
                         status="completed",
@@ -90,10 +91,11 @@ class AnalysisService:
             else:
                 state = self.repository.load_state(state_path)
 
-            job = self._update(job, message="Calculating the presentation score and valuation.")
-            analysis = StockAnalysisBuilder().build(
-                job.symbol, job.analysis_date, agent_state=state
+            job = self._update(
+                job,
+                message="Running the grounded AI score, valuation, and trader synthesis.",
             )
+            analysis = self._build_analysis(job.symbol, job.analysis_date, state)
             self.repository.save_analysis(analysis)
             self._update(
                 job,
@@ -119,6 +121,20 @@ class AnalysisService:
         existing = self.repository.get_analysis(symbol, analysis_date)
         if existing:
             return existing
-        analysis = StockAnalysisBuilder().build(symbol, analysis_date, state)
+        analysis = self._build_analysis(symbol, analysis_date, state)
         self.repository.save_analysis(analysis)
         return analysis
+
+    @staticmethod
+    def _build_analysis(
+        symbol: str,
+        analysis_date: date,
+        state: dict,
+    ) -> StockAnalysis:
+        builder = StockAnalysisBuilder()
+        analysis = builder.build(symbol, analysis_date, state)
+        return AIStockAnalysisGenerator(DEFAULT_CONFIG).enhance(
+            analysis,
+            builder.last_evidence,
+            state,
+        )

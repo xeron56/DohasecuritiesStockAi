@@ -155,6 +155,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     return JSON.stringify(report.agent_reports.raw_state, null, 2);
   }
 
+  hasAgentEvidence(report: StockAnalysis): boolean {
+    const evidence = report.agent_reports;
+    return Boolean(
+      evidence.market_report ||
+        evidence.news_report ||
+        evidence.fundamentals_report ||
+        evidence.investment_plan ||
+        evidence.final_trade_decision ||
+        Object.keys(evidence.raw_state).length,
+    );
+  }
+
   private loadStocks(): void {
     this.loadingStocks.set(true);
     this.subscriptions.push(

@@ -336,6 +336,24 @@ Environment overrides are applied to `DEFAULT_CONFIG` before this code runs.
 
 ## REST API and local dashboard
 
+To fetch the yearly DSE evidence, run one grounded AI synthesis for the score,
+valuation weighting, full research, and trader view, then open the UI without
+running the long multi-agent graph, use:
+
+```bash
+dohasecuritiesstockai-dashboard GP --date 2026-08-10
+```
+
+The command sends only the collected, date-bounded evidence to the configured
+deep-thinking model and requires that provider's API key. Numeric valuation
+methods remain calculation-backed; the AI assigns reliability weights, writes
+the research, and produces the trader view. The first UI launch may still need
+time to install/build the Angular frontend. Use `--no-open-ui` to generate and
+save the AI payload without starting the server, or `--no-ai` for the original
+calculation-only fallback.
+The equivalent source-tree command is
+`python -m dohasecuritiesstockai.dashboard_cli GP --date 2026-08-10`.
+
 Start the read-only analysis API:
 
 ```bash
