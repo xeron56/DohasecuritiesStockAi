@@ -141,6 +141,14 @@ def prediction_dashboard_url(host: str, port: int, run_id: str) -> str:
     return f"http://{browser_host}:{port}/?{query}"
 
 
+def opportunity_dashboard_url(host: str, port: int, scan_id: str) -> str:
+    """Return the standalone browser URL for one opportunity scan."""
+
+    browser_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+    query = urlencode({"view": "opportunities", "run": scan_id})
+    return f"http://{browser_host}:{port}/?{query}"
+
+
 def _url_is_ready(url: str, *, expect_html: bool = False) -> bool:
     try:
         with urlopen(url, timeout=0.5) as response:  # noqa: S310 - local user URL only
@@ -229,6 +237,47 @@ def launch_prediction_dashboard(
         target=_open_when_ready,
         args=(health_url, url),
         name="timesfm-dashboard-browser-opener",
+        daemon=True,
+    )
+    opener.start()
+    uvicorn.run(
+        "dohasecuritiesstockai.api.app:app",
+        host=resolved_host,
+        port=resolved_port,
+        reload=False,
+    )
+    return url
+
+
+def launch_opportunity_dashboard(
+    scan_id: str,
+    *,
+    host: str | None = None,
+    port: int | None = None,
+) -> str:
+    """Build, serve, and open the standalone opportunity-research screen."""
+
+    resolved_host = host or os.environ.get("TRADINGAGENTS_API_HOST", "127.0.0.1")
+    resolved_port = port or int(os.environ.get("TRADINGAGENTS_API_PORT", "8000"))
+    url = opportunity_dashboard_url(resolved_host, resolved_port, scan_id)
+    browser_root = url.split("?", 1)[0]
+    health_url = f"{browser_root.rstrip('/')}/api/v1/health"
+
+    if _url_is_ready(health_url):
+        if not _url_is_ready(browser_root, expect_html=True):
+            raise DashboardLaunchError(
+                f"Port {resolved_port} already has the API without the Angular UI. "
+                "Stop that server and run the opportunities command again."
+            )
+        webbrowser.open(url)
+        return url
+
+    dist = ensure_ui_build()
+    os.environ["TRADINGAGENTS_UI_DIST_DIR"] = str(dist)
+    opener = threading.Thread(
+        target=_open_when_ready,
+        args=(health_url, url),
+        name="opportunity-dashboard-browser-opener",
         daemon=True,
     )
     opener.start()
