@@ -18,6 +18,12 @@ load_dotenv(_PROJECT_ROOT / ".env", override=False)
 
 from dohasecuritiesstockai.dataflows.dse import normalize_dse_symbol  # noqa: E402
 from dohasecuritiesstockai.default_config import DEFAULT_CONFIG  # noqa: E402
+from dohasecuritiesstockai.opportunity_screener.repository import (  # noqa: E402
+    OpportunityRepository,
+)
+from dohasecuritiesstockai.opportunity_screener.schema import (  # noqa: E402
+    OpportunityScanResult,
+)
 from dohasecuritiesstockai.timesfm_forecasting.repository import PredictionRepository  # noqa: E402
 from dohasecuritiesstockai.timesfm_forecasting.schema import TimesFMPredictionResult  # noqa: E402
 
@@ -72,6 +78,7 @@ def create_app() -> FastAPI:
 
     repository = AnalysisRepository(DEFAULT_CONFIG["results_dir"])
     prediction_repository = PredictionRepository(DEFAULT_CONFIG["results_dir"])
+    opportunity_repository = OpportunityRepository(DEFAULT_CONFIG["results_dir"])
     service = AnalysisService(
         repository,
         max_workers=int(os.environ.get("TRADINGAGENTS_API_WORKERS", "1")),
@@ -123,6 +130,23 @@ def create_app() -> FastAPI:
         result = prediction_repository.get(run_id)
         if result is None:
             raise HTTPException(status_code=404, detail="Prediction run not found.")
+        return result
+
+    @router.get("/opportunities/latest", response_model=OpportunityScanResult)
+    def latest_opportunity_scan() -> OpportunityScanResult:
+        result = opportunity_repository.latest()
+        if result is None:
+            raise HTTPException(
+                status_code=404,
+                detail="No opportunity scan exists. Run dohasecuritiesstockai-opportunities first.",
+            )
+        return result
+
+    @router.get("/opportunities/{scan_id}", response_model=OpportunityScanResult)
+    def opportunity_scan(scan_id: str) -> OpportunityScanResult:
+        result = opportunity_repository.get(scan_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail="Opportunity scan not found.")
         return result
 
     @router.post(
