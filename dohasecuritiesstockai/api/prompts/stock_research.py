@@ -30,6 +30,10 @@ NON-NEGOTIABLE EVIDENCE RULES
    reserve/surplus, the annual `profit` field, or columnar balance-sheet amounts.
    Never label those raw amounts as crore, million, billion, lakh, or a BDT amount.
    Prefer per-share figures; otherwise call them "gateway-reported units".
+9. Do not create or reconstruct standalone key-number cards, EPS/NAV/dividend history,
+   ownership breakdowns, or recent-disclosure feeds. Those UI/data blocks are
+   intentionally excluded. Mention only concise, decision-relevant implications
+   supported by the remaining evidence.
 
 AI FUNDAMENTAL SCORE
 Return 0-10 judgments for exactly five factors. The application, not you, calculates
