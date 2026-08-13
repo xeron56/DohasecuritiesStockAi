@@ -694,7 +694,7 @@ def get_user_selections():
         # For Ollama, surface the resolved endpoint (OLLAMA_BASE_URL vs default)
         # before model selection so it's obvious where we're connecting.
         if selected_llm_provider == "ollama":
-            confirm_ollama_endpoint(backend_url)
+            confirm_ollama_endpoint(backend_url or "")
 
         # Confirm the provider's API key is present; prompt the user to paste
         # one and persist it to .env if it's missing, so the analysis run
