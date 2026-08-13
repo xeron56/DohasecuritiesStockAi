@@ -46,7 +46,22 @@ _FACTOR_WEIGHTS = {
     "dividend": 1.5,
 }
 _METHOD_KEYS = ("historical_pe", "peer_pe", "historical_pb", "dividend_yield")
+_EXCLUDED_RAW_EVIDENCE_KEYS = frozenset(
+    {
+        "annual_financial_performance",
+        "quarterly_performance",
+        "shareholding_history",
+        "dividend_history",
+        "nav_history",
+        "operating_cash_flow_per_share_history",
+    }
+)
 _NARRATIVE_PATTERNS = {
+    "removed dashboard UI section": re.compile(
+        r"\b(?:key numbers|profits?\s*&\s*dividends?|who owns it|"
+        r"recent DSE disclosures)\b",
+        re.IGNORECASE,
+    ),
     "overall /100 score": re.compile(
         r"(?:\d+(?:\.\d+)?\s*/\s*100|[০-৯]+\s*/\s*১০০)", re.IGNORECASE
     ),
@@ -187,6 +202,21 @@ def _agent_evidence(state: dict[str, Any] | None) -> dict[str, str]:
     return {key: _clip(state.get(key)) for key in keys if state.get(key)}
 
 
+def _evidence_for_ai(evidence: dict[str, Any]) -> dict[str, Any]:
+    """Exclude raw datasets belonging to UI blocks that are not AI features.
+
+    The application may still use these DSE rows for deterministic calculations,
+    but the model should not receive or reproduce the removed key-number, history,
+    ownership, or disclosure feeds.
+    """
+
+    return {
+        key: value
+        for key, value in evidence.items()
+        if key not in _EXCLUDED_RAW_EVIDENCE_KEYS
+    }
+
+
 def _extract_json(content: str) -> dict[str, Any]:
     stripped = content.strip()
     fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", stripped, re.DOTALL)
@@ -305,7 +335,7 @@ class AIStockAnalysisGenerator:
     ) -> StockAnalysis:
         mode = "multi_agent_synthesis" if agent_state else "ai_fundamental"
         prompt_evidence = {
-            **evidence,
+            **_evidence_for_ai(evidence),
             "multi_agent_reports": _agent_evidence(agent_state),
         }
         task = AI_STOCK_RESEARCH_TASK_TEMPLATE.format(
