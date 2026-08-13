@@ -1,0 +1,199 @@
+<main class="opportunity-page">
+  <header class="topbar">
+    <a class="brand" href="?view=opportunities" aria-label="Opportunity research home">
+      <span class="brand-mark">D</span>
+      <span>DOHA <strong>LONG VIEW</strong></span>
+    </a>
+    <span class="mode-chip">DSE · 2–5 YEAR RESEARCH</span>
+  </header>
+
+  @if (loading()) {
+    <section class="state-card" aria-live="polite">
+      <span class="spinner"></span>
+      <h1>Loading the research shortlist…</h1>
+      <p>Reading the saved deterministic screen and AI review.</p>
+    </section>
+  } @else if (errorMessage()) {
+    <section class="state-card error" aria-live="polite">
+      <span class="state-icon">!</span>
+      <h1>Opportunity scan not found</h1>
+      <p>{{ errorMessage() }}</p>
+      <code>dohasecuritiesstockai-opportunities --no-open-ui</code>
+    </section>
+  } @else if (result(); as scan) {
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">BEGINNER-FRIENDLY EQUITY RESEARCH</p>
+        <h1>Find overlooked quality.<br /><span>Question every bargain.</span></h1>
+        <p class="hero-intro">
+          A transparent shortlist of less-followed DSE companies that survived profitability,
+          valuation, safety, liquidity, and value-trap checks.
+        </p>
+      </div>
+      <dl class="scan-stats">
+        <div><dt>Universe</dt><dd>{{ scan.methodology.initial_universe }}</dd></div>
+        <div><dt>Eligible</dt><dd>{{ scan.methodology.eligible_universe }}</dd></div>
+        <div><dt>Deep reviews</dt><dd>{{ scan.methodology.detailed_finalists }}</dd></div>
+        <div><dt>As of</dt><dd>{{ scan.as_of | date: 'mediumDate' }}</dd></div>
+      </dl>
+    </section>
+
+    <aside class="safety-banner">
+      <div class="safety-icon">i</div>
+      <div>
+        <strong>“Low price” does not mean “cheap.”</strong>
+        <p>
+          The screen compares price with earnings, assets, cash flow, quality, and risk.
+          A less-popular share may be illiquid or permanently impaired. No result guarantees profit.
+        </p>
+      </div>
+    </aside>
+
+    <section class="method-strip" aria-label="Screen methodology">
+      <span>30% Quality & growth</span>
+      <span>25% Valuation</span>
+      <span>20% Financial safety</span>
+      <span>10% Value-trap check</span>
+      <span>10% Under-followed</span>
+      <span>5% Data quality</span>
+    </section>
+
+    <section class="section-heading">
+      <div>
+        <p class="eyebrow">RANKED RESEARCH QUEUE</p>
+        <h2>Companies worth investigating—not blindly buying</h2>
+      </div>
+      @if (scan.ai_enabled) {
+        <span class="ai-source">AI: {{ scan.ai_provider }} / {{ scan.ai_model }}</span>
+      }
+    </section>
+
+    <section class="candidate-list">
+      @for (candidate of candidates(); track candidate.symbol) {
+        <article class="candidate-card" [class.open]="expandedSymbol() === candidate.symbol">
+          <div class="candidate-summary">
+            <div class="rank">#{{ candidate.rank }}</div>
+            <div class="identity">
+              <div class="identity-line">
+                <span class="symbol">{{ candidate.symbol }}</span>
+                <span class="sector">{{ candidate.sector }}</span>
+                <span class="category">Category {{ candidate.category }}</span>
+              </div>
+              <h3>{{ candidate.company_name }}</h3>
+              <p>{{ candidate.why_it_ranked[0] }}</p>
+            </div>
+
+            <div class="score" [style.--score]="candidate.score">
+              <strong>{{ candidate.score | number: '1.0-1' }}</strong>
+              <span>/100</span>
+            </div>
+
+            <div class="priority">
+              <span [class]="'label ' + labelClass(candidate.research_label)">
+                {{ candidate.research_label }}
+              </span>
+              @if (candidate.ai_review; as ai) {
+                <small>AI: {{ ai.verdict }} · {{ ai.confidence }} confidence</small>
+              } @else {
+                <small>AI review not run</small>
+              }
+            </div>
+
+            <button type="button" class="details-button" (click)="toggle(candidate.symbol)">
+              {{ expandedSymbol() === candidate.symbol ? 'Close' : 'See evidence' }}
+            </button>
+          </div>
+
+          <div class="quick-metrics">
+            <div><span>Verified price</span><strong>{{ taka(candidate.metrics.current_price) }}</strong></div>
+            <div><span>P/E</span><strong>{{ metric(candidate.metrics.pe_ratio, '×') }}</strong></div>
+            <div><span>P/B</span><strong>{{ metric(candidate.metrics.price_to_book, '×') }}</strong></div>
+            <div><span>ROE</span><strong>{{ metric(candidate.metrics.roe_percent, '%') }}</strong></div>
+            <div><span>EPS growth</span><strong>{{ signed(candidate.metrics.eps_growth_percent) }}</strong></div>
+            <div><span>12-month move</span><strong>{{ signed(candidate.metrics.twelve_month_return_percent) }}</strong></div>
+          </div>
+
+          @if (expandedSymbol() === candidate.symbol) {
+            <div class="candidate-detail">
+              <section class="factor-panel">
+                <h4>How the score was built</h4>
+                @for (factor of factorEntries(candidate.factors); track factor.key) {
+                  <div class="factor-row">
+                    <span>{{ factor.label }}</span>
+                    <div class="bar"><i [style.width.%]="factor.value"></i></div>
+                    <strong>{{ factor.value | number: '1.0-0' }}</strong>
+                  </div>
+                }
+              </section>
+
+              <section class="evidence-panel">
+                <div class="evidence-column positive">
+                  <h4>Why it reached the shortlist</h4>
+                  <ul>
+                    @for (reason of candidate.why_it_ranked; track reason) { <li>{{ reason }}</li> }
+                  </ul>
+                </div>
+                <div class="evidence-column danger">
+                  <h4>What could make it a trap</h4>
+                  <ul>
+                    @for (risk of candidate.red_flags; track risk) { <li>{{ risk }}</li> }
+                    @if (!candidate.red_flags.length) { <li>No automatic red flag fired; manual review is still required.</li> }
+                  </ul>
+                </div>
+              </section>
+
+              @if (candidate.ai_review; as ai) {
+                <section class="ai-review">
+                  <div class="ai-review-header">
+                    <p class="eyebrow">AI EVIDENCE REVIEW</p>
+                    <span [class]="'label ' + labelClass(ai.verdict)">{{ ai.verdict }}</span>
+                  </div>
+                  <div class="ai-copy-grid">
+                    <article><h4>Thesis</h4><p>{{ ai.thesis }}</p></article>
+                    <article><h4>What may be overlooked</h4><p>{{ ai.what_market_may_be_missing }}</p></article>
+                    <article><h4>Multi-year path</h4><p>{{ ai.multi_year_path }}</p></article>
+                    <article><h4>Valuation discipline</h4><p>{{ ai.valuation_discipline }}</p></article>
+                  </div>
+                  <div class="three-lists">
+                    <div><h4>Catalysts to verify</h4><ul>@for (item of ai.catalysts; track item) { <li>{{ item }}</li> }</ul></div>
+                    <div><h4>Risks</h4><ul>@for (item of ai.risks; track item) { <li>{{ item }}</li> }</ul></div>
+                    <div><h4>Future checkpoints</h4><ul>@for (item of ai.checkpoints; track item) { <li>{{ item }}</li> }</ul></div>
+                  </div>
+                </section>
+              }
+
+              <footer class="evidence-footer">
+                <span>Latest evidence periods:</span>
+                @for (period of candidate.evidence_periods | keyvalue; track period.key) {
+                  <small>{{ period.key }}: {{ period.value }}</small>
+                }
+                @if (candidate.missing_evidence.length) {
+                  <small class="missing">Missing: {{ candidate.missing_evidence.join(', ') }}</small>
+                }
+              </footer>
+            </div>
+          }
+        </article>
+      }
+    </section>
+
+    <section class="methodology-card">
+      <div>
+        <p class="eyebrow">HOW TO USE THIS</p>
+        <h2>Shortlist, verify, diversify, then decide.</h2>
+      </div>
+      <ol>
+        <li>Read the latest audited annual report and every recent DSE disclosure.</li>
+        <li>Check whether cash flow supports reported earnings and debt is manageable.</li>
+        <li>Confirm daily liquidity is sufficient for your intended position size.</li>
+        <li>Re-run quarterly; remove a thesis when its checkpoints fail.</li>
+        <li>Use diversification and money you can afford to leave invested—or lose.</li>
+      </ol>
+    </section>
+
+    <footer class="page-footer">
+      <strong>DOHA LONG VIEW</strong>
+      <p>{{ scan.disclaimer }}</p>
+    </footer>
+  }
+</main>

@@ -47311,7 +47311,7 @@
   "live_feed": {
     "enabled": true,
     "transport": "sockjs_stomp",
-    "url": "https://gateway.dohasecurities.com.bd/notificationservice/ws-notification",
+    "url": "http://192.168.3.32:9071/notificationservice/ws-notification",
     "topic": "/topic/stock-updates",
     "stock_code": "BXPHARMA'PB",
     "note": "The Angular UI filters live STOMP updates for this symbol and compares the latest traded price with the nearest future forecast point."

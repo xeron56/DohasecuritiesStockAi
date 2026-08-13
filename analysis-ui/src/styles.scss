@@ -1,27 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap');
+
 * {
   box-sizing: border-box;
 }
 
 html {
   scroll-behavior: smooth;
+  background-color: #05070c;
 }
 
 html,
 body {
   min-height: 100%;
   margin: 0;
+  background: #090d16;
+  color: #f3f4f6;
+  overflow-x: hidden;
 }
 
 body,
 button,
-select {
-  font-family:
-    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    "Noto Sans Bengali", sans-serif;
+select,
+input,
+textarea {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Noto Sans Bengali";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
 select,
 summary {
-  outline-color: #527c9e;
+  outline-color: #0ea5e9;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0b0f19;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1f2937;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
 }

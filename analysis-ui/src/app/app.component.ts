@@ -52,6 +52,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly jobMessage = signal<string>('');
   readonly errorMessage = signal<string>('');
   readonly fullReportOpen = signal<boolean>(false);
+  readonly activeReportTab = signal<'overview' | 'trader' | 'agents' | 'raw'>('overview');
   readonly subscriptions: Subscription[] = [];
 
   selectedSymbol = 'GP';
@@ -264,7 +265,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         datasets: [
           {
             data: [report.fundamental_score, 100 - report.fundamental_score],
-            backgroundColor: ['#527c9e', '#ebe6dc'],
+            backgroundColor: ['#0ea5e9', '#1e293b'],
             borderWidth: 0,
             hoverOffset: 0,
           },

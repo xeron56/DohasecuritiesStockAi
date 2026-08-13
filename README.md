@@ -399,6 +399,40 @@ and npm and may take longer because it installs locked frontend dependencies and
 creates a production build. The server is read-only and remains open until
 `Ctrl+C`.
 
+## Long-term DSE opportunity screener
+
+The separate opportunity command builds a research queue for a beginner who
+wants to investigate less-followed DSE equities over a two-to-five-year horizon.
+It does **not** predict a guaranteed winner or treat a low nominal share price as
+cheap. The deterministic first pass screens the full listed universe for
+profitability, relative valuation, financial safety, liquidity, and possible
+value traps. Only the strongest diversified finalists receive deeper historical
+evidence collection and an optional structured AI review.
+
+Run a five-year scan and open its dedicated UI:
+
+```bash
+dohasecuritiesstockai-opportunities --horizon 5 --limit 10 --open-ui
+```
+
+Run the evidence-based ranking without sending finalist data to an LLM:
+
+```bash
+dohasecuritiesstockai-opportunities --no-ai --no-open-ui
+```
+
+The AI prompt receives only the saved evidence for the shortlisted companies.
+It is instructed to identify missing data, avoid outside memory and precise
+future-price claims, and return research priorities, risks, catalysts, and
+checkpoints—not buy instructions. Every result includes source periods and
+missing-evidence warnings. The methodology is informed by established research
+on value, profitability, investment, and risk, including the
+[Fama–French five-factor model](https://www.sciencedirect.com/science/article/pii/S0304405X14002323)
+and [profitability research by Robert Novy-Marx](https://www.nber.org/papers/w15940).
+Before using real money, review the
+[Bangladesh Securities and Exchange Commission investor education material](https://sec.gov.bd/home/ieprogram)
+and verify the latest audited report and DSE disclosures.
+
 ## Optional TimesFM stock forecasting
 
 The independent prediction command backtests TimesFM on a held-out part of DSE
