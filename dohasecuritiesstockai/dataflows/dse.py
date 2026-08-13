@@ -37,7 +37,7 @@ from .errors import (
 from .stockstats_utils import _assert_ohlcv_not_stale, _clean_dataframe
 from .utils import safe_ticker_component
 
-DEFAULT_DSE_GATEWAY_URL = "https://gateway.dohasecurities.com.bd"
+DEFAULT_DSE_GATEWAY_URL = "http://192.168.3.32:9071"
 DSE_ACCESS_TOKEN_ENV = "DSE_ACCESS_TOKEN"
 DSE_EMAIL_OR_PHONE_ENV = "DSE_EMAIL_OR_PHONE"
 DSE_PASSWORD_ENV = "DSE_PASSWORD"
