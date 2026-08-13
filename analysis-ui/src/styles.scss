@@ -6,15 +6,15 @@
 
 html {
   scroll-behavior: smooth;
-  background-color: #05070c;
+  background-color: #f3f0e8;
 }
 
 html,
 body {
   min-height: 100%;
   margin: 0;
-  background: #090d16;
-  color: #f3f4f6;
+  background: #f3f0e8;
+  color: #17201c;
   overflow-x: hidden;
 }
 
@@ -31,7 +31,7 @@ textarea {
 button,
 select,
 summary {
-  outline-color: #0ea5e9;
+  outline-color: #0b7458;
 }
 
 /* Custom Scrollbar */
@@ -41,14 +41,14 @@ summary {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0b0f19;
+  background: #f3f0e8;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1f2937;
+  background: #d7d7cb;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #374151;
+  background: #b8b8aa;
 }

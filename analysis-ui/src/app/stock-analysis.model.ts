@@ -101,6 +101,12 @@ export interface AIResearch {
   trader_report: AITraderReport;
 }
 
+export interface EvidenceSource {
+  name: string;
+  source_type: 'dse_api' | 'agent_state' | 'calculation' | 'ai_analysis';
+  detail: string;
+}
+
 export interface StockAnalysis {
   schema_version: '1.0';
   analysis_id: string;
@@ -121,6 +127,7 @@ export interface StockAnalysis {
   report_sections: ReportSection[];
   agent_reports: AgentReports;
   ai_research?: AIResearch | null;
+  sources: EvidenceSource[];
   disclaimer: BilingualText;
 }
 
