@@ -156,7 +156,7 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # Doha Securities production endpoints discovered from web-ui. Only the
     # non-secret service location is stored here. Authentication is supplied at
     # runtime via DSE_ACCESS_TOKEN and is never written to config or cache.
-    "dse_gateway_url": "https://gateway.dohasecurities.com.bd",
+    "dse_gateway_url": "http://192.168.3.32:9071",
     "dse_market_data_url": None,
     "dse_analytics_url": None,
     "dse_auth_path": "/usermanagementservice/v1/auth_server/token/custom-flow",
