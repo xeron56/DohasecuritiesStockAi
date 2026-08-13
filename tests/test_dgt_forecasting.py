@@ -3,10 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
-import torch
+import pytest
 
-import dohasecuritiesstockai.dgt_forecasting as dgt
-from dohasecuritiesstockai.timesfm_forecasting.market_data import (
+torch = pytest.importorskip("torch")
+
+import dohasecuritiesstockai.dgt_forecasting as dgt  # noqa: E402
+from dohasecuritiesstockai.timesfm_forecasting.market_data import (  # noqa: E402
     MarketCandle,
     normalize_resolution,
 )
