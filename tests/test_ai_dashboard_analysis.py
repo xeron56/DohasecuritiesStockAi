@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from dohasecuritiesstockai.api.ai_analysis import (
     AIStockAnalysisGenerator,
     AIStockResearchOutput,
+    _evidence_for_ai,
     _narrative_violations,
 )
 from dohasecuritiesstockai.api.models import (
@@ -190,7 +191,12 @@ def test_ai_enhancement_recomputes_score_and_weighted_value() -> None:
 
     result = generator.enhance(
         _baseline(),
-        {"annual_financial_performance": [{"year": 2025, "eps_basic": "12.4"}]},
+        {
+            "market_snapshot": {"latest_price": 50},
+            "annual_financial_performance": [
+                {"year": 2025, "eps_basic": "12.4"}
+            ],
+        },
     )
 
     assert result.fundamental_score == 80
@@ -209,9 +215,27 @@ def test_ai_enhancement_recomputes_score_and_weighted_value() -> None:
     assert "Never invent" in messages[0]["content"]
     assert "Never state, estimate, or repeat an overall" in messages[0]["content"]
     assert "Never state a weighted" in messages[0]["content"]
-    assert '"year": 2025' in messages[1]["content"]
+    assert '"latest_price": 50' in messages[1]["content"]
+    assert '"year": 2025' not in messages[1]["content"]
+    assert "annual_financial_performance" not in messages[1]["content"]
     assert "ai_fundamental" in messages[1]["content"]
     assert '"fundamental_score"' not in messages[1]["content"]
+
+
+def test_ai_evidence_excludes_removed_ui_datasets() -> None:
+    evidence = {
+        "market_snapshot": {"latest_price": 50},
+        "annual_financial_performance": [{"year": 2025}],
+        "quarterly_performance": [{"quarter": "Q3"}],
+        "shareholding_history": [{"government": 50.35}],
+        "dividend_history": [{"year": 2025, "cash_dividend": 160}],
+        "nav_history": [{"year": 2025, "nav_per_share": 302.87}],
+        "operating_cash_flow_per_share_history": [{"nocfps": -39.83}],
+    }
+
+    filtered = _evidence_for_ai(evidence)
+
+    assert filtered == {"market_snapshot": {"latest_price": 50}}
 
 
 def test_multi_agent_state_changes_ai_research_mode() -> None:
@@ -257,3 +281,14 @@ def test_narrative_guard_retries_structured_output_once() -> None:
     assert result.headline.en == good.headline.en
     assert len(calls) == 2
     assert _narrative_violations(good) == []
+
+
+def test_narrative_guard_rejects_removed_ui_sections() -> None:
+    payload = _ai_output().model_dump()
+    payload["in_depth_title"] = _text("Recent DSE Disclosures")
+
+    violations = _narrative_violations(
+        AIStockResearchOutput.model_validate(payload)
+    )
+
+    assert any("removed dashboard UI section" in item for item in violations)
