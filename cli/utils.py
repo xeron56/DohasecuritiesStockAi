@@ -6,12 +6,13 @@ from dotenv import find_dotenv, set_key
 from rich.console import Console
 
 from cli.models import AnalystType, AssetType
+from cli.theme import CLI_THEME, PROMPT_MARK, PROMPT_POINTER, PROMPT_STYLE
 from dohasecuritiesstockai.default_config import DEFAULT_CONFIG
 from dohasecuritiesstockai.languages import OUTPUT_LANGUAGE_CHOICES
 from dohasecuritiesstockai.llm_clients.api_key_env import get_api_key_env
 from dohasecuritiesstockai.llm_clients.model_catalog import get_model_options
 
-console = Console()
+console = Console(theme=CLI_THEME, highlight=False)
 
 TICKER_INPUT_EXAMPLES = "GP, BRACBANK, SQURPHARMA"
 
@@ -49,16 +50,12 @@ def get_ticker() -> str:
             is_valid_ticker_input(x)
             or "Please enter a valid ticker symbol, e.g. AAPL, 000404.SZ, 0700.HK, GC=F."
         ),
-        style=questionary.Style(
-            [
-                ("text", "fg:green"),
-                ("highlighted", "noinherit"),
-            ]
-        ),
+        qmark=PROMPT_MARK,
+        style=PROMPT_STYLE,
     ).ask()
 
     if ticker is None:
-        console.print("\n[red]No ticker symbol provided. Exiting...[/red]")
+        console.print("\n[danger]No ticker symbol provided. Exiting…[/danger]")
         exit(1)
 
     return normalize_ticker_symbol(ticker) if ticker.strip() else "GP"
@@ -114,11 +111,7 @@ def filter_analysts_for_asset_type(
 ) -> list[AnalystType]:
     if asset_type != AssetType.CRYPTO:
         return analysts
-    return [
-        analyst
-        for analyst in analysts
-        if analyst != AnalystType.FUNDAMENTALS
-    ]
+    return [analyst for analyst in analysts if analyst != AnalystType.FUNDAMENTALS]
 
 
 def get_analysis_date() -> str:
@@ -137,18 +130,15 @@ def get_analysis_date() -> str:
 
     date = questionary.text(
         "Enter the analysis date (YYYY-MM-DD):",
-        validate=lambda x: validate_date(x.strip())
-        or "Please enter a valid date in YYYY-MM-DD format.",
-        style=questionary.Style(
-            [
-                ("text", "fg:green"),
-                ("highlighted", "noinherit"),
-            ]
+        validate=lambda x: (
+            validate_date(x.strip()) or "Please enter a valid date in YYYY-MM-DD format."
         ),
+        qmark=PROMPT_MARK,
+        style=PROMPT_STYLE,
     ).ask()
 
     if not date:
-        console.print("\n[red]No date provided. Exiting...[/red]")
+        console.print("\n[danger]No date provided. Exiting…[/danger]")
         exit(1)
 
     return date.strip()
@@ -170,26 +160,21 @@ def select_analysts(
             analyst for analyst in available_analysts if analyst != AnalystType.SOCIAL
         ]
     choices = questionary.checkbox(
-        "Select Your [Analysts Team]:",
+        "Choose analyst coverage:",
         choices=[
             questionary.Choice(display, value=value)
             for display, value in ANALYST_ORDER
             if value in available_analysts
         ],
-        instruction="\n- Press Space to select/unselect analysts\n- Press 'a' to select/unselect all\n- Press Enter when done",
+        instruction="Space select · A toggle all · Enter continue",
         validate=lambda x: len(x) > 0 or "You must select at least one analyst.",
-        style=questionary.Style(
-            [
-                ("checkbox-selected", "fg:green"),
-                ("selected", "fg:green noinherit"),
-                ("highlighted", "noinherit"),
-                ("pointer", "noinherit"),
-            ]
-        ),
+        qmark=PROMPT_MARK,
+        pointer=PROMPT_POINTER,
+        style=PROMPT_STYLE,
     ).ask()
 
     if not choices:
-        console.print("\n[red]No analysts selected. Exiting...[/red]")
+        console.print("\n[danger]No analysts selected. Exiting…[/danger]")
         exit(1)
 
     return choices
@@ -200,28 +185,22 @@ def select_research_depth() -> int:
 
     # Define research depth options with their corresponding values
     DEPTH_OPTIONS = [
-        ("Shallow - Quick research, few debate and strategy discussion rounds", 1),
-        ("Medium - Middle ground, moderate debate rounds and strategy discussion", 3),
-        ("Deep - Comprehensive research, in depth debate and strategy discussion", 5),
+        ("Quick scan · 1 debate and risk round", 1),
+        ("Balanced review · 3 debate and risk rounds", 3),
+        ("High-conviction review · 5 debate and risk rounds", 5),
     ]
 
     choice = questionary.select(
-        "Select Your [Research Depth]:",
-        choices=[
-            questionary.Choice(display, value=value) for display, value in DEPTH_OPTIONS
-        ],
-        instruction="\n- Use arrow keys to navigate\n- Press Enter to select",
-        style=questionary.Style(
-            [
-                ("selected", "fg:yellow noinherit"),
-                ("highlighted", "fg:yellow noinherit"),
-                ("pointer", "fg:yellow noinherit"),
-            ]
-        ),
+        "Choose research depth:",
+        choices=[questionary.Choice(display, value=value) for display, value in DEPTH_OPTIONS],
+        instruction="Arrow keys move · Enter select",
+        qmark=PROMPT_MARK,
+        pointer=PROMPT_POINTER,
+        style=PROMPT_STYLE,
     ).ask()
 
     if choice is None:
-        console.print("\n[red]No research depth selected. Exiting...[/red]")
+        console.print("\n[danger]No research depth selected. Exiting…[/danger]")
         exit(1)
 
     return choice
@@ -235,14 +214,24 @@ def select_research_depth() -> int:
 # shortlist. Provider names are stable (unlike model IDs), so this rarely needs
 # touching; anything not here is still reachable via Custom ID.
 _OPENROUTER_MAINSTREAM = {
-    "openai", "anthropic", "google", "deepseek", "qwen", "mistralai",
-    "meta-llama", "x-ai", "z-ai", "minimax", "moonshotai",
+    "openai",
+    "anthropic",
+    "google",
+    "deepseek",
+    "qwen",
+    "mistralai",
+    "meta-llama",
+    "x-ai",
+    "z-ai",
+    "minimax",
+    "moonshotai",
 }
 
 
 def _fetch_openrouter_models() -> list[tuple[str, str]]:
     """Fetch available models from the OpenRouter API."""
     import requests
+
     try:
         resp = requests.get("https://openrouter.ai/api/v1/models", timeout=10)
         resp.raise_for_status()
@@ -253,7 +242,7 @@ def _fetch_openrouter_models() -> list[tuple[str, str]]:
         models.sort(key=lambda m: m.get("created") or 0, reverse=True)
         return [(m.get("name") or m["id"], m["id"]) for m in models]
     except Exception as e:
-        console.print(f"\n[yellow]Could not fetch OpenRouter models: {e}[/yellow]")
+        console.print(f"\n[warning]Could not fetch OpenRouter models: {e}[/warning]")
         return []
 
 
@@ -267,9 +256,11 @@ def _require_text(message: str, hint: str) -> str:
     response = questionary.text(
         message,
         validate=lambda x: len(x.strip()) > 0 or hint,
+        qmark=PROMPT_MARK,
+        style=PROMPT_STYLE,
     ).ask()
     if response is None:
-        console.print("\n[red]Cancelled. Exiting...[/red]")
+        console.print("\n[danger]Cancelled. Exiting…[/danger]")
         exit(1)
     return response.strip()
 
@@ -284,7 +275,8 @@ def select_openrouter_model(mode: str) -> str:
     # Prefer the newest from mainstream providers so the shortlist isn't crowded
     # out by niche/experimental releases; fall back to all if none match.
     mainstream = [
-        (name, mid) for name, mid in models
+        (name, mid)
+        for name, mid in models
         if not mid.startswith("~")  # skip variant/alias duplicate routes
         and mid.split("/", 1)[0] in _OPENROUTER_MAINSTREAM
     ]
@@ -296,16 +288,14 @@ def select_openrouter_model(mode: str) -> str:
     choice = questionary.select(
         f"Select Your [{mode.title()}-Thinking] OpenRouter Model (latest available):",
         choices=choices,
-        instruction="\n- Use arrow keys to navigate\n- Press Enter to select",
-        style=questionary.Style([
-            ("selected", "fg:magenta noinherit"),
-            ("highlighted", "fg:magenta noinherit"),
-            ("pointer", "fg:magenta noinherit"),
-        ]),
+        instruction="Arrow keys move · Enter select",
+        qmark=PROMPT_MARK,
+        pointer=PROMPT_POINTER,
+        style=PROMPT_STYLE,
     ).ask()
 
     if choice is None:
-        console.print("\n[red]No model selected. Exiting...[/red]")
+        console.print("\n[danger]No model selected. Exiting…[/danger]")
         exit(1)
     if choice == "custom":
         return _require_text(
@@ -337,18 +327,14 @@ def _select_model(provider: str, mode: str) -> str:
             questionary.Choice(display, value=value)
             for display, value in get_model_options(provider, mode)
         ],
-        instruction="\n- Use arrow keys to navigate\n- Press Enter to select",
-        style=questionary.Style(
-            [
-                ("selected", "fg:magenta noinherit"),
-                ("highlighted", "fg:magenta noinherit"),
-                ("pointer", "fg:magenta noinherit"),
-            ]
-        ),
+        instruction="Arrow keys move · Enter select",
+        qmark=PROMPT_MARK,
+        pointer=PROMPT_POINTER,
+        style=PROMPT_STYLE,
     ).ask()
 
     if choice is None:
-        console.print(f"\n[red]No {mode} thinking llm engine selected. Exiting...[/red]")
+        console.print(f"\n[danger]No {mode} thinking model selected. Exiting…[/danger]")
         exit(1)
 
     if choice == "custom":
@@ -365,6 +351,7 @@ def select_shallow_thinking_agent(provider) -> str:
 def select_deep_thinking_agent(provider) -> str:
     """Select deep thinking llm engine using an interactive selection."""
     return _select_model(provider, "deep")
+
 
 def _llm_provider_table() -> list[tuple[str, str, str | None]]:
     """(display_name, provider_key, base_url) for every supported provider.
@@ -424,11 +411,15 @@ def prompt_openai_compatible_url() -> str:
     url = questionary.text(
         "Enter the OpenAI-compatible base URL "
         "(e.g. http://localhost:8000/v1 for vLLM, http://localhost:1234/v1 for LM Studio):",
-        validate=lambda x: x.strip().startswith(("http://", "https://"))
-        or "Enter a URL starting with http:// or https://",
+        validate=lambda x: (
+            x.strip().startswith(("http://", "https://"))
+            or "Enter a URL starting with http:// or https://"
+        ),
+        qmark=PROMPT_MARK,
+        style=PROMPT_STYLE,
     ).ask()
     if not url:
-        console.print("\n[red]No endpoint URL provided. Exiting...[/red]")
+        console.print("\n[danger]No endpoint URL provided. Exiting…[/danger]")
         exit(1)
     return url.strip()
 
@@ -443,18 +434,14 @@ def select_llm_provider() -> tuple[str, str | None]:
             questionary.Choice(display, value=(provider_key, url))
             for display, provider_key, url in PROVIDERS
         ],
-        instruction="\n- Use arrow keys to navigate\n- Press Enter to select",
-        style=questionary.Style(
-            [
-                ("selected", "fg:magenta noinherit"),
-                ("highlighted", "fg:magenta noinherit"),
-                ("pointer", "fg:magenta noinherit"),
-            ]
-        ),
+        instruction="Arrow keys move · Enter select",
+        qmark=PROMPT_MARK,
+        pointer=PROMPT_POINTER,
+        style=PROMPT_STYLE,
     ).ask()
 
     if choice is None:
-        console.print("\n[red]No LLM provider selected. Exiting...[/red]")
+        console.print("\n[danger]No LLM provider selected. Exiting…[/danger]")
         exit(1)
 
     provider, url = choice
@@ -471,11 +458,9 @@ def ask_openai_reasoning_effort() -> str:
     return questionary.select(
         "Select Reasoning Effort:",
         choices=choices,
-        style=questionary.Style([
-            ("selected", "fg:cyan noinherit"),
-            ("highlighted", "fg:cyan noinherit"),
-            ("pointer", "fg:cyan noinherit"),
-        ]),
+        qmark=PROMPT_MARK,
+        pointer=PROMPT_POINTER,
+        style=PROMPT_STYLE,
     ).ask()
 
 
@@ -493,11 +478,9 @@ def ask_anthropic_effort() -> str | None:
             questionary.Choice("Medium (balanced)", "medium"),
             questionary.Choice("Low (faster, cheaper)", "low"),
         ],
-        style=questionary.Style([
-            ("selected", "fg:cyan noinherit"),
-            ("highlighted", "fg:cyan noinherit"),
-            ("pointer", "fg:cyan noinherit"),
-        ]),
+        qmark=PROMPT_MARK,
+        pointer=PROMPT_POINTER,
+        style=PROMPT_STYLE,
     ).ask()
 
 
@@ -513,11 +496,9 @@ def ask_gemini_thinking_config() -> str | None:
             questionary.Choice("Enable Thinking (recommended)", "high"),
             questionary.Choice("Minimal/Disable Thinking", "minimal"),
         ],
-        style=questionary.Style([
-            ("selected", "fg:green noinherit"),
-            ("highlighted", "fg:green noinherit"),
-            ("pointer", "fg:green noinherit"),
-        ]),
+        qmark=PROMPT_MARK,
+        pointer=PROMPT_POINTER,
+        style=PROMPT_STYLE,
     ).ask()
 
 
@@ -539,11 +520,9 @@ def ask_glm_region() -> tuple[str, str]:
                 value=("glm-cn", "https://open.bigmodel.cn/api/paas/v4/"),
             ),
         ],
-        style=questionary.Style([
-            ("selected", "fg:cyan noinherit"),
-            ("highlighted", "fg:cyan noinherit"),
-            ("pointer", "fg:cyan noinherit"),
-        ]),
+        qmark=PROMPT_MARK,
+        pointer=PROMPT_POINTER,
+        style=PROMPT_STYLE,
     ).ask()
 
 
@@ -566,11 +545,9 @@ def ask_qwen_region() -> tuple[str, str]:
                 value=("qwen-cn", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
             ),
         ],
-        style=questionary.Style([
-            ("selected", "fg:cyan noinherit"),
-            ("highlighted", "fg:cyan noinherit"),
-            ("pointer", "fg:cyan noinherit"),
-        ]),
+        qmark=PROMPT_MARK,
+        pointer=PROMPT_POINTER,
+        style=PROMPT_STYLE,
     ).ask()
 
 
@@ -593,11 +570,9 @@ def ask_minimax_region() -> tuple[str, str]:
                 value=("minimax-cn", "https://api.minimaxi.com/v1"),
             ),
         ],
-        style=questionary.Style([
-            ("selected", "fg:cyan noinherit"),
-            ("highlighted", "fg:cyan noinherit"),
-            ("pointer", "fg:cyan noinherit"),
-        ]),
+        qmark=PROMPT_MARK,
+        pointer=PROMPT_POINTER,
+        style=PROMPT_STYLE,
     ).ask()
 
 
@@ -613,21 +588,21 @@ def confirm_ollama_endpoint(url: str) -> None:
     """
     from_env = os.environ.get("OLLAMA_BASE_URL")
     origin = " (from OLLAMA_BASE_URL)" if from_env and from_env == url else ""
-    console.print(f"[green]✓ Using Ollama at {url}{origin}[/green]")
+    console.print(f"[success]✓ Using Ollama at {url}{origin}[/success]")
 
     if not url.startswith(("http://", "https://")):
         console.print(
-            f"[yellow]Note: {url!r} is missing a scheme. "
+            f"[warning]Note: {url!r} is missing a scheme. "
             f"Ollama-serve typically expects a URL like "
-            f"http://<host>:11434/v1.[/yellow]"
+            f"http://<host>:11434/v1.[/warning]"
         )
     elif ":11434" not in url and "://localhost" not in url and "://127.0.0.1" not in url:
         # Soft hint when the port differs from the ollama-serve default
         # and the host isn't local (where users sometimes proxy on :80).
         console.print(
-            f"[yellow]Note: {url!r} doesn't include port 11434. "
+            f"[warning]Note: {url!r} doesn't include port 11434. "
             f"Make sure your remote ollama-serve listens on the port "
-            f"shown above.[/yellow]"
+            f"shown above.[/warning]"
         )
 
 
@@ -649,6 +624,7 @@ def ensure_api_key(provider: str) -> str | None:
     # Key-optional providers (generic OpenAI-compatible / local servers) read the
     # key when present but must never force an interactive prompt.
     from dohasecuritiesstockai.llm_clients.openai_client import OPENAI_COMPATIBLE_PROVIDERS
+
     spec = OPENAI_COMPATIBLE_PROVIDERS.get(provider.lower())
     if spec is not None and spec.key_optional:
         return os.environ.get(env_var)
@@ -657,27 +633,21 @@ def ensure_api_key(provider: str) -> str | None:
     if existing:
         return existing
 
-    console.print(
-        f"\n[yellow]{env_var} is not set in your environment.[/yellow]"
-    )
+    console.print(f"\n[warning]{env_var} is not set in your environment.[/warning]")
     key = questionary.password(
         f"Paste your {env_var} (will be saved to .env):",
-        style=questionary.Style([
-            ("text", "fg:cyan"),
-            ("highlighted", "noinherit"),
-        ]),
+        qmark=PROMPT_MARK,
+        style=PROMPT_STYLE,
     ).ask()
     if not key:
-        console.print(
-            f"[red]Skipped. API calls will fail until {env_var} is set.[/red]"
-        )
+        console.print(f"[danger]Skipped. API calls will fail until {env_var} is set.[/danger]")
         return None
 
     env_path = find_dotenv(usecwd=True) or str(Path.cwd() / ".env")
     Path(env_path).touch(exist_ok=True)
     set_key(env_path, env_var, key)
     os.environ[env_var] = key
-    console.print(f"[green]Saved {env_var} to {env_path}[/green]")
+    console.print(f"[success]Saved {env_var} to {env_path}[/success]")
     return key
 
 
@@ -685,15 +655,10 @@ def ask_output_language() -> str:
     """Ask for the English or Bangla report-output language."""
     choice = questionary.select(
         "Select Output Language:",
-        choices=[
-            questionary.Choice(label, value)
-            for label, value in OUTPUT_LANGUAGE_CHOICES
-        ],
-        style=questionary.Style([
-            ("selected", "fg:yellow noinherit"),
-            ("highlighted", "fg:yellow noinherit"),
-            ("pointer", "fg:yellow noinherit"),
-        ]),
+        choices=[questionary.Choice(label, value) for label, value in OUTPUT_LANGUAGE_CHOICES],
+        qmark=PROMPT_MARK,
+        pointer=PROMPT_POINTER,
+        style=PROMPT_STYLE,
     ).ask()
 
     # Output language has a sensible default, so a cancel falls back to English
