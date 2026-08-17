@@ -344,6 +344,13 @@ running the long multi-agent graph, use:
 dohasecuritiesstockai-dashboard GP --date 2026-08-10
 ```
 
+To reopen an already completed multi-agent run in the UI without rerunning the
+analysis or making another AI call, use:
+
+```bash
+dohasecuritiesstockai-dashboard SQURPHARMA --date 2026-08-17 --saved-run --no-ai
+```
+
 The command sends only the collected, date-bounded evidence to the configured
 deep-thinking model and requires that provider's API key. Numeric valuation
 methods remain calculation-backed; the AI assigns reliability weights, writes
