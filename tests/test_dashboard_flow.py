@@ -30,9 +30,7 @@ def test_lightweight_dashboard_command_skips_agent_state(tmp_path: Path, monkeyp
         ai_research=None,
     )
 
-    def fake_prepare(
-        symbol, analysis_date, agent_state, results_dir, *, use_ai, config
-    ):
+    def fake_prepare(symbol, analysis_date, agent_state, results_dir, *, use_ai, config):
         calls["prepare"] = (
             symbol,
             analysis_date,
@@ -70,6 +68,52 @@ def test_lightweight_dashboard_command_skips_agent_state(tmp_path: Path, monkeyp
     assert calls["launch"] == ("GP", date(2026, 8, 10), "0.0.0.0", 8123)
 
 
+def test_saved_dashboard_command_loads_completed_agent_state(tmp_path: Path, monkeypatch) -> None:
+    calls: dict[str, object] = {}
+    state_dir = tmp_path / "SQURPHARMA" / "TradingAgentsStrategy_logs"
+    state_dir.mkdir(parents=True)
+    state_path = state_dir / "full_states_log_2026-08-17.json"
+    state_path.write_text('{"market_report":"saved market report"}', encoding="utf-8")
+    analysis = SimpleNamespace(
+        symbol="SQURPHARMA",
+        analysis_date=date(2026, 8, 17),
+        fundamental_score=70,
+        score_label=SimpleNamespace(en="Good"),
+        ai_research=None,
+    )
+
+    def fake_prepare(symbol, analysis_date, agent_state, results_dir, *, use_ai, config):
+        calls["prepare"] = (
+            symbol,
+            analysis_date,
+            agent_state,
+            results_dir,
+            use_ai,
+            config,
+        )
+        return analysis, tmp_path / "SQURPHARMA.json"
+
+    monkeypatch.setattr(dashboard_cli, "prepare_dashboard_analysis", fake_prepare)
+    monkeypatch.setitem(dashboard_cli.DEFAULT_CONFIG, "results_dir", str(tmp_path))
+
+    dashboard_cli.show_dashboard(
+        "SQURPHARMA",
+        analysis_date="2026-08-17",
+        saved_run=True,
+        use_ai=False,
+        open_ui=False,
+    )
+
+    assert calls["prepare"] == (
+        "SQURPHARMA",
+        date(2026, 8, 17),
+        {"market_report": "saved market report"},
+        str(tmp_path),
+        False,
+        dashboard_cli.DEFAULT_CONFIG,
+    )
+
+
 def test_prepare_dashboard_analysis_accepts_lightweight_mode(tmp_path: Path, monkeypatch) -> None:
     built = SimpleNamespace(symbol="GP", analysis_date=date(2026, 8, 10))
     calls: dict[str, object] = {}
@@ -90,9 +134,7 @@ def test_prepare_dashboard_analysis_accepts_lightweight_mode(tmp_path: Path, mon
     monkeypatch.setattr("dohasecuritiesstockai.dashboard.StockAnalysisBuilder", FakeBuilder)
     monkeypatch.setattr("dohasecuritiesstockai.dashboard.AnalysisRepository", FakeRepository)
 
-    result, path = prepare_dashboard_analysis(
-        "GP", "2026-08-10", None, tmp_path, use_ai=False
-    )
+    result, path = prepare_dashboard_analysis("GP", "2026-08-10", None, tmp_path, use_ai=False)
 
     assert result is built
     assert path == tmp_path / "analysis.json"
