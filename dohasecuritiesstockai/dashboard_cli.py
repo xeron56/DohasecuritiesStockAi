@@ -9,6 +9,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 
+from dohasecuritiesstockai.api.repository import AnalysisRepository
 from dohasecuritiesstockai.dashboard import (
     dashboard_url,
     launch_dashboard,
@@ -28,6 +29,14 @@ def show_dashboard(
         str | None,
         typer.Option("--date", "-d", help="Dashboard data date (YYYY-MM-DD)."),
     ] = None,
+    saved_run: Annotated[
+        bool,
+        typer.Option(
+            "--saved-run/--fresh",
+            help="Load the completed multi-agent state for this symbol/date instead of "
+            "opening a data-only dashboard.",
+        ),
+    ] = False,
     use_ai: Annotated[
         bool,
         typer.Option(
@@ -65,21 +74,42 @@ def show_dashboard(
         Panel.fit(
             f"[bold]DSE score dashboard[/bold]\n"
             f"{symbol.strip().upper()} · {requested_date.isoformat()} · "
-            f"{'grounded AI research' if use_ai else 'calculated data only'}",
+            f"{'saved multi-agent run' if saved_run else 'fresh DSE evidence'} · "
+            f"{'AI synthesis' if use_ai else 'no additional AI call'}",
             border_style="cyan",
         )
     )
+
+    agent_state = None
+    state_path = None
+    if saved_run:
+        repository = AnalysisRepository(DEFAULT_CONFIG["results_dir"])
+        state_path = repository.find_state_log(symbol, requested_date)
+        if state_path is None:
+            console.print(
+                "[bold red]Saved run not found:[/bold red] "
+                f"{symbol.strip().upper()} on {requested_date.isoformat()}"
+            )
+            raise typer.Exit(code=1)
+        try:
+            agent_state = repository.load_state(state_path)
+        except (OSError, ValueError) as exc:
+            console.print(f"[bold red]Saved run could not be read:[/bold red] {exc}")
+            raise typer.Exit(code=1) from None
     try:
-        status = (
-            "Collecting yearly DSE evidence and running the configured AI analyst…"
-            if use_ai
-            else "Requesting the dashboard fields from the DSE data APIs…"
-        )
+        if saved_run:
+            status = "Loading the saved reports and current dashboard metrics…"
+        else:
+            status = (
+                "Collecting yearly DSE evidence and running the configured AI analyst…"
+                if use_ai
+                else "Requesting the dashboard fields from the DSE data APIs…"
+            )
         with console.status(status):
             analysis, saved_path = prepare_dashboard_analysis(
                 symbol,
                 requested_date,
-                agent_state=None,
+                agent_state=agent_state,
                 results_dir=DEFAULT_CONFIG["results_dir"],
                 use_ai=use_ai,
                 config=DEFAULT_CONFIG,
@@ -93,6 +123,8 @@ def show_dashboard(
         f"[green]✓ Fundamental score:[/green] "
         f"{analysis.fundamental_score}/100 ({analysis.score_label.en})"
     )
+    if state_path is not None:
+        console.print(f"[green]✓ Saved reports loaded:[/green] {state_path}")
     if analysis.ai_research is not None:
         console.print(
             f"[green]✓ AI analyst:[/green] {analysis.ai_research.provider} / "
