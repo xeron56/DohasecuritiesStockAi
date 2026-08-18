@@ -16,6 +16,9 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_DEEP_THINK_LLM":       "deep_think_llm",
     "TRADINGAGENTS_QUICK_THINK_LLM":      "quick_think_llm",
     "TRADINGAGENTS_LLM_BACKEND_URL":      "backend_url",
+    "TRADINGAGENTS_RESEARCH_LLM_PROVIDER": "research_llm_provider",
+    "TRADINGAGENTS_RESEARCH_LLM_MODEL":    "research_llm_model",
+    "TRADINGAGENTS_RESEARCH_LLM_BACKEND_URL": "research_llm_backend_url",
     "TRADINGAGENTS_OUTPUT_LANGUAGE":      "output_language",
     "TRADINGAGENTS_MAX_DEBATE_ROUNDS":    "max_debate_rounds",
     "TRADINGAGENTS_MAX_RISK_ROUNDS":      "max_risk_discuss_rounds",
@@ -106,6 +109,12 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # provider-specific URL here would leak (e.g. OpenAI's /v1 was previously
     # being forwarded to Gemini, producing malformed request URLs).
     "backend_url": None,
+    # Optional dedicated model for the structured ten-question company report.
+    # Empty values reuse the main provider/model. Set these to openai + a GPT
+    # model to send only this grounded synthesis call directly to OpenAI.
+    "research_llm_provider": "",
+    "research_llm_model": "",
+    "research_llm_backend_url": "",
     # Provider-specific thinking configuration
     "google_thinking_level": None,      # "high", "minimal", etc.
     "openai_reasoning_effort": None,    # "medium", "high", "low"
