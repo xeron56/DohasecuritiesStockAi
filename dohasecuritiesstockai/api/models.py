@@ -74,6 +74,7 @@ class ReportSection(APIModel):
     key: str
     title: BilingualText
     summary: BilingualText
+    body: list[BilingualText] = Field(default_factory=list)
     bullets: list[BilingualText] = Field(default_factory=list)
 
 
@@ -102,6 +103,7 @@ class AITraderReport(APIModel):
 class AIResearch(APIModel):
     provider: str
     model: str
+    prompt_version: str = "company-analysis-v2"
     mode: Literal["ai_fundamental", "multi_agent_synthesis"]
     generated_at: datetime
     score_confidence: Literal["low", "medium", "high"]
