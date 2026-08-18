@@ -358,6 +358,27 @@ the research, and produces the trader view. The first UI launch may still need
 time to install/build the Angular frontend. Use `--no-open-ui` to generate and
 save the AI payload without starting the server, or `--no-ai` for the original
 calculation-only fallback.
+
+The score screen places a collapsible company analysis immediately below the
+score. Its structured prompt always follows the same ten questions: company,
+revenue model, profitability, financial safety, valuation method, shareholder
+rewards, competitive edge, upside case, risks, and investor suitability. The
+model receives the date-bounded company profile, annual/quarterly results,
+balance sheet, ownership, dividends, cash flow, price history, calculated
+valuation anchors, and any completed agent reports. Unexpected evidence keys
+are not forwarded.
+
+To send this one structured research call directly to OpenAI while leaving the
+multi-agent graph on another provider, set:
+
+```dotenv
+OPENAI_API_KEY=your-key
+TRADINGAGENTS_RESEARCH_LLM_PROVIDER=openai
+TRADINGAGENTS_RESEARCH_LLM_MODEL=gpt-5.4
+```
+
+If the dedicated research settings are omitted, the dashboard uses the main
+`TRADINGAGENTS_LLM_PROVIDER` and `TRADINGAGENTS_DEEP_THINK_LLM` values.
 The equivalent source-tree command is
 `python -m dohasecuritiesstockai.dashboard_cli GP --date 2026-08-10`.
 

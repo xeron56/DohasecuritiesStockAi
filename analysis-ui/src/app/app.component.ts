@@ -135,6 +135,15 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadLatest(this.selectedSymbol);
   }
 
+  openCompanyAnalysis(): void {
+    const analysis = document.getElementById(
+      'company-analysis',
+    ) as HTMLDetailsElement | null;
+    if (!analysis) return;
+    analysis.open = true;
+    analysis.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   runAnalysis(force = false): void {
     this.loadingAnalysis.set(true);
     this.errorMessage.set('');

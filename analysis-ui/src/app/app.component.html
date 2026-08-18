@@ -120,6 +120,72 @@
         </aside>
       </section>
 
+      @if (report.ai_research; as ai) {
+        <details id="company-analysis" class="company-analysis section-anchor">
+          <summary>
+            <span class="analysis-summary-icon">AI</span>
+            <span class="analysis-summary-copy">
+              <small>{{ language() === 'bn' ? 'স্কোরের পেছনের সম্পূর্ণ বিশ্লেষণ' : 'THE FULL ANALYSIS BEHIND THE SCORE' }}</small>
+              <strong>{{ language() === 'bn' ? 'কোম্পানির ১০-ধাপের বিশ্লেষণ দেখুন' : 'Read the 10-question company analysis' }}</strong>
+              <span>{{ copy(report.headline) }}</span>
+            </span>
+            <span class="analysis-summary-action">
+              {{ language() === 'bn' ? 'বিশ্লেষণ খুলুন' : 'Open analysis' }}
+              <i aria-hidden="true"></i>
+            </span>
+          </summary>
+
+          <div class="company-analysis-body">
+            <header class="analysis-introduction">
+              <div>
+                <p class="eyebrow">AI COMPANY ANALYSIS · {{ ai.provider }} / {{ ai.model }}</p>
+                <h2>{{ copy(report.in_depth_title) }}</h2>
+                <p>{{ copy(report.in_depth_snippet) }}</p>
+              </div>
+              <span>Data as of {{ report.analysis_date | date: 'mediumDate' }}</span>
+            </header>
+
+            <div class="analysis-chapters">
+              @for (section of report.report_sections; track section.key; let index = $index) {
+                <article class="analysis-chapter" [class.bull-chapter]="section.key === 'bull_case'" [class.risk-chapter]="section.key === 'risks'">
+                  <span class="chapter-number">{{ (index + 1).toString().padStart(2, '0') }}</span>
+                  <div class="chapter-content">
+                    <h3>{{ copy(section.title) }}</h3>
+                    <p class="chapter-answer">{{ copy(section.summary) }}</p>
+
+                    @for (paragraph of section.body; track $index) {
+                      <p class="chapter-paragraph">{{ copy(paragraph) }}</p>
+                    }
+
+                    @if (section.key === 'valuation') {
+                      <div class="analysis-value-callout">
+                        <div><small>VALUE TODAY</small><strong>{{ copy(report.valuation.verdict_label) }}</strong></div>
+                        <div><small>CURRENT</small><strong>{{ formatTaka(report.valuation.current_price) }}</strong></div>
+                        <div><small>ROUGH ESTIMATE</small><strong>{{ formatTaka(report.valuation.rough_estimate) }}</strong></div>
+                        <div><small>FAIR RANGE</small><strong>{{ formatTaka(report.valuation.fair_range_low) }}–{{ formatTaka(report.valuation.fair_range_high) }}</strong></div>
+                      </div>
+                    }
+
+                    @if (section.bullets.length) {
+                      <ul class="chapter-bullets">
+                        @for (bullet of section.bullets; track bullet.en) {
+                          <li>{{ copy(bullet) }}</li>
+                        }
+                      </ul>
+                    }
+                  </div>
+                </article>
+              }
+            </div>
+
+            <footer class="analysis-method-note">
+              <span>✓</span>
+              <p><strong>Grounded structured analysis.</strong> Generated from date-bounded DSE evidence and validated against a fixed ten-question format. {{ copy(report.disclaimer) }}</p>
+            </footer>
+          </div>
+        </details>
+      }
+
       <section class="market-ribbon" aria-label="Market snapshot">
         <div class="price-cell">
           <span>{{ language() === 'bn' ? 'সর্বশেষ মূল্য' : 'Latest price' }}</span>
@@ -151,10 +217,11 @@
       </section>
 
       <nav class="section-nav" aria-label="Report sections">
-        <button type="button" (click)="jumpTo('decision-summary')">01 · Decision</button>
-        <button type="button" (click)="jumpTo('valuation')">02 · Valuation</button>
-        <button type="button" (click)="jumpTo('factor-scorecard')">03 · Factors</button>
-        <button type="button" (click)="jumpTo('research-dossier')">04 · Full dossier</button>
+        @if (report.ai_research) { <button type="button" (click)="openCompanyAnalysis()">01 · Analysis</button> }
+        <button type="button" (click)="jumpTo('decision-summary')">02 · Decision</button>
+        <button type="button" (click)="jumpTo('valuation')">03 · Valuation</button>
+        <button type="button" (click)="jumpTo('factor-scorecard')">04 · Factors</button>
+        <button type="button" (click)="jumpTo('research-dossier')">05 · Full dossier</button>
         <span>{{ reportDocumentCount() }} agent documents</span>
       </nav>
 
@@ -322,23 +389,6 @@
                 }
               </div>
               <footer><span class="status-badge" [class]="factor.status"><i>{{ factor.status === 'positive' ? '✓' : factor.status === 'negative' ? '×' : '!' }}</i>{{ factorStatus(factor.status) }}</span></footer>
-            </article>
-          }
-        </div>
-      </section>
-
-      <section class="summary-reports">
-        <header class="section-heading compact">
-          <div><p class="eyebrow">DETERMINISTIC SUMMARY</p><h2>{{ copy(report.in_depth_title) }}</h2></div>
-        </header>
-        <div class="summary-report-grid">
-          @for (section of report.report_sections; track section.key) {
-            <article [class]="getSectionStatus(section.key)">
-              <header><span>{{ getSectionStatus(section.key) === 'positive' ? '✓' : getSectionStatus(section.key) === 'negative' ? '×' : getSectionStatus(section.key) === 'caution' ? '!' : '•' }}</span><h3>{{ copy(section.title) }}</h3></header>
-              <p>{{ copy(section.summary) }}</p>
-              @if (section.bullets.length) {
-                <ul>@for (bullet of section.bullets; track bullet.en) { <li>{{ copy(bullet) }}</li> }</ul>
-              }
             </article>
           }
         </div>
