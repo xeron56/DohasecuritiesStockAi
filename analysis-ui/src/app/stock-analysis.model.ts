@@ -64,6 +64,7 @@ export interface ReportSection {
   key: string;
   title: BilingualText;
   summary: BilingualText;
+  body: BilingualText[];
   bullets: BilingualText[];
 }
 
@@ -92,6 +93,7 @@ export interface AITraderReport {
 export interface AIResearch {
   provider: string;
   model: string;
+  prompt_version?: string;
   mode: 'ai_fundamental' | 'multi_agent_synthesis';
   generated_at: string;
   score_confidence: 'low' | 'medium' | 'high';
