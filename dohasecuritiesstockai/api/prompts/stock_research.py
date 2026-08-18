@@ -30,10 +30,12 @@ NON-NEGOTIABLE EVIDENCE RULES
    reserve/surplus, the annual `profit` field, or columnar balance-sheet amounts.
    Never label those raw amounts as crore, million, billion, lakh, or a BDT amount.
    Prefer per-share figures; otherwise call them "gateway-reported units".
-9. Do not create or reconstruct standalone key-number cards, EPS/NAV/dividend history,
-   ownership breakdowns, or recent-disclosure feeds. Those UI/data blocks are
-   intentionally excluded. Mention only concise, decision-relevant implications
-   supported by the remaining evidence.
+9. The evidence may include company profile, ownership, annual and quarterly
+   performance, balance-sheet history, loans, dividends, NAV, operating cash flow,
+   price candles and multi-agent reports. Reconcile them into prose; never dump raw
+   JSON or turn the response into an unexplained list of figures.
+10. Use the date-bounded DSE rows as the primary authority. Multi-agent prose may add
+   interpretation, but raw numeric evidence wins whenever the two conflict.
 
 AI FUNDAMENTAL SCORE
 Return 0-10 judgments for exactly five factors. The application, not you, calculates
@@ -67,8 +69,42 @@ narrative field. You may quote the four immutable method anchors and current pri
 FULL RESEARCH
 Produce exactly ten sections: company, business_model, profitability,
 financial_safety, valuation, dividends, moat, bull_case, risks, and suitability.
-Make the report useful to a trader: include concrete yearly trends, data limitations,
-catalysts, invalidation conditions, entry discipline, risk controls, and time horizon.
+This is a strict reading format based on the supplied reference analysis. The
+application supplies the fixed numbered questions, so do not return or rewrite titles.
+For every section return:
+- `summary`: one short, direct answer to that section's question;
+- `body`: 1-4 self-contained explanatory paragraphs, ordered from the plain-language
+  answer to the most decision-relevant evidence;
+- `bullets`: an empty list for every section except bull_case and risks. For bull_case
+  and risks return 3-6 concise, evidence-backed points.
+
+Follow this exact question sequence and content purpose:
+01 What does this company do? — products/services, sector, scale, listing/ownership
+   context only when supported.
+02 How does it make money? — revenue engine, customers, recurring/cyclical nature,
+   revenue and operating trend evidence.
+03 Is it actually making money? — profit/EPS record, direction, consistency and the
+   latest meaningful change.
+04 Is it financially safe? — debt, equity/liquidity, cash conversion, balance-sheet
+   resilience and any data limitation.
+05 How do we judge if the price is reasonable? — explain the four supplied valuation
+   yardsticks and durable inputs. Leave live verdict/range math to the application.
+06 Does it reward shareholders? — dividend history, consistency, growth and payout
+   sustainability; distinguish interim from annual dividends.
+07 What makes it special? — evidenced scale, efficiency, customer/network/brand or
+   other defensible edge; explicitly say when a moat is not demonstrated.
+08 Why it could do well — one framing paragraph plus 3-6 distinct upside bullets.
+09 What could go wrong — one framing paragraph plus 3-6 distinct risk bullets.
+10 So, is it for you? — describe the investor profile and trade-offs in educational,
+   non-personalized terms.
+
+The complete report should read like a connected analyst explanation, not ten isolated
+cards. Use concrete yearly trends and comparisons whenever the evidence supports them.
+Explain financial terms in plain language on first use. Do not repeat the same fact in
+multiple sections unless the repeated fact directly changes the conclusion.
+
+Make the companion trader fields useful: include data limitations, catalysts,
+invalidation conditions, entry discipline, risk controls, and time horizon.
 Never promise returns. Never personalize position sizing because the user's holdings,
 risk tolerance, and liquidity needs are unknown.
 For entry strategy, do not invent technical support/resistance or use the not-yet-known
@@ -93,9 +129,13 @@ the supplied analyst/trader reports with the raw DSE evidence; raw numeric evide
 when prose conflicts with it. If mode is ai_fundamental, state that the trader view is
 based on fundamentals, price history, and disclosures only—not a full multi-agent debate.
 
-Return the required structured object. Keep each long section substantive but concise;
-across the ten sections, cover every material strength, weakness, valuation issue, and
-decision condition present in the evidence.
+Return the required structured object. Begin with a sharp one-sentence `headline` in
+the style "A [business character] company that [main strength] — but [main risk]."
+Use `in_depth_title` for a concise company-specific analysis heading and
+`in_depth_summary` for a two-to-four sentence overview matching the supplied reference.
+Across the ten sections, cover every material strength, weakness, valuation issue, and
+decision condition present in the evidence. Do not add section titles: the application
+uses the fixed question sequence from the system prompt.
 
 AUTHORITATIVE EVIDENCE JSON:
 {evidence_json}
