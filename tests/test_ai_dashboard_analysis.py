@@ -71,9 +71,17 @@ def _ai_output() -> AIStockResearchOutput:
             "sections": [
                 {
                     "key": key,
-                    "title": _text(key.replace("_", " ").title()),
                     "summary": _text(f"Detailed {key} analysis"),
-                    "bullets": [_text(f"{key} evidence point")],
+                    "body": [_text(f"Evidence-led {key} explanation")],
+                    "bullets": (
+                        [
+                            _text(f"{key} evidence point one"),
+                            _text(f"{key} evidence point two"),
+                            _text(f"{key} evidence point three"),
+                        ]
+                        if key in {"bull_case", "risks"}
+                        else []
+                    ),
                 }
                 for key in section_keys
             ],
@@ -209,6 +217,9 @@ def test_ai_enhancement_recomputes_score_and_weighted_value() -> None:
     assert result.ai_research.mode == "ai_fundamental"
     assert result.ai_research.trader_report.rating == "Overweight"
     assert len(result.report_sections) == 10
+    assert result.report_sections[0].title.en == "What does this company do?"
+    assert result.report_sections[-1].title.en == "So, is it for you?"
+    assert result.report_sections[0].body[0].en == "Evidence-led company explanation"
     assert all(factor.metrics[0].key == "ai_factor_assessment" for factor in result.factors)
 
     messages = captured["messages"]
@@ -216,13 +227,34 @@ def test_ai_enhancement_recomputes_score_and_weighted_value() -> None:
     assert "Never state, estimate, or repeat an overall" in messages[0]["content"]
     assert "Never state a weighted" in messages[0]["content"]
     assert '"latest_price": 50' in messages[1]["content"]
-    assert '"year": 2025' not in messages[1]["content"]
-    assert "annual_financial_performance" not in messages[1]["content"]
+    assert '"year": 2025' in messages[1]["content"]
+    assert "annual_financial_performance" in messages[1]["content"]
     assert "ai_fundamental" in messages[1]["content"]
     assert '"fundamental_score"' not in messages[1]["content"]
 
 
-def test_ai_evidence_excludes_removed_ui_datasets() -> None:
+def test_dedicated_research_provider_is_recorded() -> None:
+    structured = SimpleNamespace(invoke=lambda messages: _ai_output())
+    llm = SimpleNamespace(with_structured_output=lambda schema: structured)
+    generator = AIStockAnalysisGenerator(
+        {
+            "llm_provider": "openrouter",
+            "deep_think_llm": "provider/default",
+            "research_llm_provider": "openai",
+            "research_llm_model": "gpt-5.4",
+        },
+        llm=llm,
+    )
+
+    result = generator.enhance(_baseline(), {"market_snapshot": {"latest_price": 50}})
+
+    assert result.ai_research is not None
+    assert result.ai_research.provider == "openai"
+    assert result.ai_research.model == "gpt-5.4"
+    assert result.ai_research.prompt_version == "company-analysis-v2"
+
+
+def test_ai_evidence_includes_date_bounded_company_datasets() -> None:
     evidence = {
         "market_snapshot": {"latest_price": 50},
         "annual_financial_performance": [{"year": 2025}],
@@ -234,6 +266,17 @@ def test_ai_evidence_excludes_removed_ui_datasets() -> None:
     }
 
     filtered = _evidence_for_ai(evidence)
+
+    assert filtered == evidence
+
+
+def test_ai_evidence_rejects_unexpected_keys() -> None:
+    filtered = _evidence_for_ai(
+        {
+            "market_snapshot": {"latest_price": 50},
+            "access_token": "must-not-leave-process",
+        }
+    )
 
     assert filtered == {"market_snapshot": {"latest_price": 50}}
 
@@ -283,12 +326,15 @@ def test_narrative_guard_retries_structured_output_once() -> None:
     assert _narrative_violations(good) == []
 
 
-def test_narrative_guard_rejects_removed_ui_sections() -> None:
+def test_reference_format_requires_bull_and_risk_bullets() -> None:
     payload = _ai_output().model_dump()
-    payload["in_depth_title"] = _text("Recent DSE Disclosures")
+    next(section for section in payload["sections"] if section["key"] == "risks")[
+        "bullets"
+    ] = []
 
-    violations = _narrative_violations(
+    try:
         AIStockResearchOutput.model_validate(payload)
-    )
-
-    assert any("removed dashboard UI section" in item for item in violations)
+    except ValueError as exc:
+        assert "risks must contain 3-6 evidence bullets" in str(exc)
+    else:
+        raise AssertionError("Risk analysis without evidence bullets must be rejected")
