@@ -38,6 +38,31 @@ _SECTION_KEYS = (
     "risks",
     "suitability",
 )
+_SECTION_TITLES = {
+    "company": BilingualText(
+        en="What does this company do?", bn="কোম্পানিটি কী করে?"
+    ),
+    "business_model": BilingualText(
+        en="How does it make money?", bn="এটি কীভাবে আয় করে?"
+    ),
+    "profitability": BilingualText(
+        en="Is it actually making money?", bn="কোম্পানিটি কি সত্যিই মুনাফা করছে?"
+    ),
+    "financial_safety": BilingualText(
+        en="Is it financially safe?", bn="এটি কি আর্থিকভাবে নিরাপদ?"
+    ),
+    "valuation": BilingualText(
+        en="How do we judge if the price is reasonable?",
+        bn="দামটি যুক্তিসঙ্গত কি না আমরা কীভাবে বিচার করি?",
+    ),
+    "dividends": BilingualText(
+        en="Does it reward shareholders?", bn="এটি কি শেয়ারহোল্ডারদের পুরস্কৃত করে?"
+    ),
+    "moat": BilingualText(en="What makes it special?", bn="কী এটিকে বিশেষ করে তোলে?"),
+    "bull_case": BilingualText(en="Why it could do well", bn="কেন এটি ভালো করতে পারে"),
+    "risks": BilingualText(en="What could go wrong", bn="কী ভুল হতে পারে"),
+    "suitability": BilingualText(en="So, is it for you?", bn="তাহলে, এটি কি আপনার জন্য?"),
+}
 _FACTOR_WEIGHTS = {
     "profitability": 2.5,
     "financial_health": 2.5,
@@ -46,22 +71,27 @@ _FACTOR_WEIGHTS = {
     "dividend": 1.5,
 }
 _METHOD_KEYS = ("historical_pe", "peer_pe", "historical_pb", "dividend_yield")
-_EXCLUDED_RAW_EVIDENCE_KEYS = frozenset(
+_AI_EVIDENCE_KEYS = frozenset(
     {
+        "symbol",
+        "company",
+        "analysis_date",
+        "market_snapshot",
         "annual_financial_performance",
         "quarterly_performance",
+        "balance_sheet_history",
         "shareholding_history",
         "dividend_history",
         "nav_history",
+        "loan_status",
         "operating_cash_flow_per_share_history",
+        "price_momentum",
+        "technical_evidence",
+        "calculated_factors",
+        "valuation_anchors",
     }
 )
 _NARRATIVE_PATTERNS = {
-    "removed dashboard UI section": re.compile(
-        r"\b(?:key numbers|profits?\s*&\s*dividends?|who owns it|"
-        r"recent DSE disclosures)\b",
-        re.IGNORECASE,
-    ),
     "overall /100 score": re.compile(
         r"(?:\d+(?:\.\d+)?\s*/\s*100|[০-৯]+\s*/\s*১০০)", re.IGNORECASE
     ),
@@ -126,9 +156,18 @@ class AIReportSectionOutput(BaseModel):
         "risks",
         "suitability",
     ]
-    title: AIText
     summary: AIText
+    body: list[AIText] = Field(min_length=1, max_length=4)
     bullets: list[AIText] = Field(default_factory=list, max_length=6)
+
+    @model_validator(mode="after")
+    def enforce_reference_format(self):
+        if self.key in {"bull_case", "risks"}:
+            if not 3 <= len(self.bullets) <= 6:
+                raise ValueError(f"{self.key} must contain 3-6 evidence bullets")
+        elif self.bullets:
+            raise ValueError("bullets are only allowed for bull_case and risks")
+        return self
 
 
 class AITraderOutput(BaseModel):
@@ -165,8 +204,10 @@ class AIStockResearchOutput(BaseModel):
         return self
 
 
-def _provider_kwargs(config: dict[str, Any]) -> dict[str, Any]:
-    provider = str(config.get("llm_provider", "")).lower()
+def _provider_kwargs(
+    config: dict[str, Any], provider_override: str | None = None
+) -> dict[str, Any]:
+    provider = str(provider_override or config.get("llm_provider", "")).lower()
     kwargs: dict[str, Any] = {}
     if provider == "google" and config.get("google_thinking_level"):
         kwargs["thinking_level"] = config["google_thinking_level"]
@@ -203,17 +244,12 @@ def _agent_evidence(state: dict[str, Any] | None) -> dict[str, str]:
 
 
 def _evidence_for_ai(evidence: dict[str, Any]) -> dict[str, Any]:
-    """Exclude raw datasets belonging to UI blocks that are not AI features.
-
-    The application may still use these DSE rows for deterministic calculations,
-    but the model should not receive or reproduce the removed key-number, history,
-    ownership, or disclosure feeds.
-    """
+    """Allow only the date-bounded DSE datasets needed by company analysis."""
 
     return {
         key: value
         for key, value in evidence.items()
-        if key not in _EXCLUDED_RAW_EVIDENCE_KEYS
+        if key in _AI_EVIDENCE_KEYS
     }
 
 
@@ -263,14 +299,28 @@ class AIStockAnalysisGenerator:
         llm: Any | None = None,
     ) -> None:
         self.config = config or DEFAULT_CONFIG
-        self.provider = str(self.config["llm_provider"])
-        self.model = str(self.config["deep_think_llm"])
+        self.provider = str(
+            self.config.get("research_llm_provider")
+            or self.config["llm_provider"]
+        )
+        self.model = str(
+            self.config.get("research_llm_model")
+            or self.config["deep_think_llm"]
+        )
         if llm is None:
+            research_backend = self.config.get("research_llm_backend_url")
+            backend_url = (
+                research_backend
+                if research_backend not in (None, "")
+                else self.config.get("backend_url")
+                if self.provider == str(self.config["llm_provider"])
+                else None
+            )
             client = create_llm_client(
                 provider=self.provider,
                 model=self.model,
-                base_url=self.config.get("backend_url"),
-                **_provider_kwargs(self.config),
+                base_url=backend_url,
+                **_provider_kwargs(self.config, self.provider),
             )
             llm = client.get_llm()
         self.llm = llm
@@ -406,8 +456,9 @@ class AIStockAnalysisGenerator:
         sections = [
             ReportSection(
                 key=key,
-                title=ordered_sections[key].title.api_text(),
+                title=_SECTION_TITLES[key],
                 summary=ordered_sections[key].summary.api_text(),
+                body=[paragraph.api_text() for paragraph in ordered_sections[key].body],
                 bullets=[bullet.api_text() for bullet in ordered_sections[key].bullets],
             )
             for key in _SECTION_KEYS
